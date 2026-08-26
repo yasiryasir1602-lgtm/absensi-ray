@@ -14,7 +14,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js" defer></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 <style>
   :root {
     --navy-deep: #0A1F3D;
@@ -195,6 +197,50 @@
   .btn-kirim:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .footer-note { text-align: center; font-size: 11.5px; color: #9AA6BE; margin-top: 6px; }
+
+  /* Kartu geolokasi live */
+  .geo-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .geo-title { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 14.5px; color: var(--ink); }
+  .btn-kalibrasi {
+    border: none; background: none; color: var(--navy-light); font-size: 13px; font-weight: 600;
+    cursor: pointer; padding: 4px 0;
+  }
+  .geo-stats { display: flex; gap: 12px; margin-bottom: 14px; }
+  .geo-stat { flex: 1; background: #F4F6FA; border-radius: var(--radius-sm); padding: 12px; text-align: center; }
+  .geo-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px; color: var(--ink-soft); margin-bottom: 4px; }
+  .geo-value { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; font-weight: 800; color: var(--ink); }
+  .geo-status-band {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px;
+    background: #EEF1F7; border: 1px solid transparent;
+  }
+  .geo-status-band.geo-in { background: var(--ok-bg); border-color: rgba(27,138,90,0.18); }
+  .geo-status-band.geo-out { background: var(--err-bg); border-color: rgba(192,57,43,0.18); }
+  .geo-label-sm { font-size: 10px; font-weight: 700; letter-spacing: 0.3px; color: var(--ink-soft); margin-bottom: 3px; }
+  .geo-status-text { font-size: 13.5px; font-weight: 700; color: var(--ok); }
+  .geo-status-band.geo-out .geo-status-text { color: var(--err); }
+  .geo-lokasi-text { font-size: 13px; font-weight: 700; color: var(--ink); text-align: right; }
+  #peta { height: 200px; border-radius: var(--radius-sm); overflow: hidden; background: #E4E8F0; }
+
+  /* Tombol presensi + jam */
+  .btn-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .jam-label { font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
+  .jam-label b { color: var(--ink); }
+
+  /* Bottom navigation */
+  .bottom-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    background: #fff; border-top: 1px solid var(--line);
+    display: flex; padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 14px rgba(18,52,95,0.06);
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-size: 11px; font-weight: 600; color: var(--ink-soft); cursor: pointer; padding: 4px 0;
+  }
+  .nav-item .nav-icon { font-size: 19px; line-height: 1; }
+  .nav-item.aktif { color: var(--navy); }
+  body.punya-navbar { padding-bottom: 78px; }
 </style>
 </head>
 <body>
@@ -238,13 +284,61 @@
     </div>
 
     <div class="card">
-      <div class="btn-grid">
-        <button class="btn btn-in" id="btnClockIn" onclick="bukaModal('CLOCK IN')" disabled>Clock In</button>
-        <button class="btn btn-out" id="btnClockOut" onclick="bukaModal('CLOCK OUT')" disabled>Clock Out</button>
+      <div class="geo-header">
+        <span class="geo-title">🗺️ Status Geolokasi Realtime</span>
+        <button class="btn-kalibrasi" onclick="kalibrasiGPS()">📍 Kalibrasi GPS</button>
       </div>
-      <button class="btn-ganti" onclick="gantiPengguna()">Ganti Pengguna</button>
+      <div class="geo-stats">
+        <div class="geo-stat">
+          <div class="geo-label">JARAK KANTOR</div>
+          <div class="geo-value" id="jarakKantor">-- m</div>
+        </div>
+        <div class="geo-stat">
+          <div class="geo-label">AKURASI GPS</div>
+          <div class="geo-value" id="akurasiGps">±-- m</div>
+        </div>
+      </div>
+      <div class="geo-status-band" id="geoStatusBand">
+        <div>
+          <div class="geo-label-sm">STATUS KEHADIRAN</div>
+          <div class="geo-status-text" id="geoStatusText">Mencari lokasi...</div>
+        </div>
+        <div>
+          <div class="geo-label-sm">LOKASI TERDEKAT</div>
+          <div class="geo-lokasi-text" id="geoLokasiTerdekat">-</div>
+        </div>
+      </div>
+      <div id="peta"></div>
+    </div>
+
+    <div class="card">
+      <div class="btn-grid">
+        <div class="btn-col">
+          <button class="btn btn-in" id="btnClockIn" onclick="bukaModal('CLOCK IN')" disabled style="width:100%;">Presensi Masuk</button>
+          <div class="jam-label">Masuk: <b id="jamMasukTeks">--:--</b></div>
+        </div>
+        <div class="btn-col">
+          <button class="btn btn-out" id="btnClockOut" onclick="bukaModal('CLOCK OUT')" disabled style="width:100%;">Presensi Pulang</button>
+          <div class="jam-label">Pulang: <b id="jamPulangTeks">--:--</b></div>
+        </div>
+      </div>
     </div>
     <div class="footer-note">PT. Ray Mitra Perkasa</div>
+  </div>
+</div>
+
+<div class="bottom-nav" id="bottomNav" style="display:none;">
+  <div class="nav-item aktif">
+    <div class="nav-icon">▦</div>
+    Dashboard
+  </div>
+  <div class="nav-item" onclick="syncData()">
+    <div class="nav-icon">⟳</div>
+    Sync Data
+  </div>
+  <div class="nav-item" onclick="gantiPengguna()">
+    <div class="nav-icon">⎋</div>
+    Logout
   </div>
 </div>
 
@@ -275,6 +369,10 @@
   var sesiNama = '';
   var sesiPin = '';
 
+  var lokasiList = [];
+  var geoWatchId = null;
+  var petaMap = null, petaMarkerUser = null, petaCircle = null;
+
   function callApi(action, params) {
     var payload = Object.assign({ action: action }, params || {});
     return fetch(API_BASE, {
@@ -284,13 +382,14 @@
     }).then(function (res) { return res.json(); });
   }
 
-  window.onload = function () {
-    updateJam();
-    setInterval(updateJam, 1000);
-    initFaceApi();
-    muatDaftarNama();
-    daftarkanServiceWorker();
-  };
+  // Dijalankan langsung (skrip ini ada di akhir body, jadi elemen di atasnya sudah ada di DOM),
+  // TIDAK menunggu window.onload — supaya daftar nama tidak tertahan oleh font/skrip eksternal yang lambat.
+  updateJam();
+  setInterval(updateJam, 1000);
+  muatDaftarNama();
+  daftarkanServiceWorker();
+  // face-api.js dimuat dengan atribut "defer", jadi baru tersedia setelah DOMContentLoaded
+  document.addEventListener('DOMContentLoaded', initFaceApi);
 
   function daftarkanServiceWorker() {
     if ('serviceWorker' in navigator) {
@@ -375,6 +474,9 @@
       terapkanStatus(res.status);
       document.getElementById('layarMasuk').style.display = 'none';
       document.getElementById('layarUtama').style.display = 'block';
+      document.getElementById('bottomNav').style.display = 'flex';
+      document.body.classList.add('punya-navbar');
+      muatDaftarLokasi().then(mulaiPantauGPS);
     }).catch(function (err) {
       btn.disabled = false;
       btn.innerText = 'Masuk';
@@ -389,6 +491,14 @@
     document.getElementById('pesanLogin').innerHTML = '';
     document.getElementById('layarUtama').style.display = 'none';
     document.getElementById('layarMasuk').style.display = 'block';
+    document.getElementById('bottomNav').style.display = 'none';
+    document.body.classList.remove('punya-navbar');
+    if (geoWatchId !== null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; }
+  }
+
+  function syncData() {
+    muatStatusUlang();
+    kalibrasiGPS();
   }
 
   function terapkanStatus(status) {
@@ -404,12 +514,102 @@
     pillIn.innerText = status.sudahClockIn ? 'Sudah Clock In' : 'Belum Clock In';
     pillOut.classList.toggle('aktif', status.sudahClockOut);
     pillOut.innerText = status.sudahClockOut ? 'Sudah Clock Out' : 'Belum Clock Out';
+
+    document.getElementById('jamMasukTeks').innerText = status.jamMasuk || '--:--';
+    document.getElementById('jamPulangTeks').innerText = status.jamPulang || '--:--';
   }
 
   function muatStatusUlang() {
     callApi('statusUlang', { nama: sesiNama, pin: sesiPin }).then(function (res) {
       if (res.sukses) terapkanStatus(res.status);
     });
+  }
+
+  // ============ GEOLOKASI LIVE & PETA ============
+
+  function muatDaftarLokasi() {
+    return callApi('daftarLokasi').then(function (res) {
+      lokasiList = res.daftar || [];
+    }).catch(function () { lokasiList = []; });
+  }
+
+  function mulaiPantauGPS() {
+    if (!navigator.geolocation) {
+      document.getElementById('geoStatusText').innerText = 'GPS tidak didukung browser ini';
+      return;
+    }
+    if (geoWatchId !== null) navigator.geolocation.clearWatch(geoWatchId);
+    geoWatchId = navigator.geolocation.watchPosition(prosesPosisiGPS, gagalAmbilGPS, {
+      enableHighAccuracy: true, maximumAge: 5000, timeout: 15000
+    });
+  }
+
+  function kalibrasiGPS() {
+    if (!navigator.geolocation) return;
+    document.getElementById('geoStatusText').innerText = 'Mengkalibrasi...';
+    navigator.geolocation.getCurrentPosition(prosesPosisiGPS, gagalAmbilGPS, {
+      enableHighAccuracy: true, timeout: 15000
+    });
+  }
+
+  function gagalAmbilGPS(err) {
+    document.getElementById('geoStatusText').innerText = 'Gagal ambil lokasi: ' + err.message;
+  }
+
+  function hitungJarakMeterClient(lat1, lon1, lat2, lon2) {
+    var R = 6371000;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLon = (lon2 - lon1) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function prosesPosisiGPS(pos) {
+    var lat = pos.coords.latitude, lng = pos.coords.longitude, akurasi = pos.coords.accuracy;
+    document.getElementById('akurasiGps').innerText = '±' + Math.round(akurasi) + ' m';
+
+    var terdekat = null, jarakTerdekat = Infinity;
+    lokasiList.forEach(function (l) {
+      var j = hitungJarakMeterClient(lat, lng, l.lat, l.lng);
+      if (j < jarakTerdekat) { jarakTerdekat = j; terdekat = l; }
+    });
+
+    var band = document.getElementById('geoStatusBand');
+    if (terdekat) {
+      document.getElementById('jarakKantor').innerText = Math.round(jarakTerdekat) + ' m';
+      document.getElementById('geoLokasiTerdekat').innerText = terdekat.nama;
+      if (jarakTerdekat <= terdekat.radius) {
+        document.getElementById('geoStatusText').innerText = 'Di dalam Radius Absensi';
+        band.classList.add('geo-in'); band.classList.remove('geo-out');
+      } else {
+        document.getElementById('geoStatusText').innerText = 'Di luar Radius Absensi';
+        band.classList.add('geo-out'); band.classList.remove('geo-in');
+      }
+    } else {
+      document.getElementById('geoStatusText').innerText = 'Lokasi kerja belum diatur';
+    }
+
+    perbaruiPeta(lat, lng, terdekat);
+  }
+
+  function perbaruiPeta(lat, lng, terdekat) {
+    if (typeof L === 'undefined') return;
+    if (!petaMap) {
+      petaMap = L.map('peta', { attributionControl: false }).setView([lat, lng], 17);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(petaMap);
+      petaMarkerUser = L.marker([lat, lng]).addTo(petaMap).bindPopup('Lokasi Anda');
+    } else {
+      petaMarkerUser.setLatLng([lat, lng]);
+      petaMap.setView([lat, lng]);
+    }
+    if (terdekat) {
+      if (petaCircle) petaMap.removeLayer(petaCircle);
+      petaCircle = L.circle([terdekat.lat, terdekat.lng], {
+        radius: terdekat.radius, color: '#12345F', fillColor: '#12345F', fillOpacity: 0.12
+      }).addTo(petaMap);
+    }
   }
 
   function bukaModal(jenis) {
