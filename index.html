@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sistem Absensi RAY</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0E2A52">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Absensi RAY">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<style>
+  :root {
+    --navy-deep: #0A1F3D;
+    --navy: #12345F;
+    --navy-light: #1E4A85;
+    --gold: #D4A853;
+    --gold-deep: #B8863A;
+    --bg: #F4F6FA;
+    --card: #FFFFFF;
+    --ink: #1A2332;
+    --ink-soft: #64708A;
+    --line: #E4E8F0;
+    --ok: #1B8A5A;
+    --ok-bg: #E5F6EE;
+    --err: #C0392B;
+    --err-bg: #FCEAE8;
+    --radius: 18px;
+    --radius-sm: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    background-image: radial-gradient(circle at 15% 0%, rgba(18,52,95,0.06), transparent 45%),
+                       radial-gradient(circle at 90% 10%, rgba(212,168,83,0.10), transparent 40%);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 0 16px 60px;
+  }
+  .wrap { width: 100%; max-width: 430px; }
+
+  /* Header / brand bar */
+  .topbar {
+    margin: 0 -16px 22px;
+    padding: 26px 20px 34px;
+    background: linear-gradient(135deg, var(--navy-deep) 0%, var(--navy) 55%, var(--navy-light) 100%);
+    border-radius: 0 0 28px 28px;
+    box-shadow: 0 10px 30px rgba(10, 31, 61, 0.25);
+    position: relative;
+    overflow: hidden;
+  }
+  .topbar::after {
+    content: '';
+    position: absolute;
+    right: -40px; top: -60px;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212,168,83,0.35), transparent 70%);
+  }
+  .brand-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+  .brand-sub {
+    font-size: 12.5px;
+    color: rgba(255,255,255,0.72);
+    margin-top: 12px;
+    letter-spacing: 0.3px;
+  }
+  .logo-plate {
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 8px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+  }
+  .logo-plate img { height: 42px; width: 42px; display: block; border-radius: 8px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 18px rgba(18, 52, 95, 0.06);
+  }
+  .identitas { display: flex; align-items: center; gap: 14px; }
+  .avatar {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--navy), var(--navy-light));
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gold); font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700; font-size: 18px; flex-shrink: 0;
+  }
+  .identitas .nama { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+  .identitas .meta { font-size: 13px; color: var(--ink-soft); }
+
+  .jam-box { text-align: center; }
+  .jam-box .tanggal { font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; font-weight: 500; }
+  .jam-box .jam {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 34px; font-weight: 800; letter-spacing: 1px;
+    background: linear-gradient(135deg, var(--navy), var(--navy-light));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .status-box { display: flex; gap: 10px; font-size: 13px; margin-top: 16px; }
+  .pill {
+    flex: 1; text-align: center; padding: 9px 6px; border-radius: 999px;
+    background: #EEF1F7; color: var(--ink-soft); font-weight: 600;
+    border: 1px solid transparent;
+  }
+  .pill.aktif { background: var(--ok-bg); color: var(--ok); border-color: rgba(27,138,90,0.15); }
+
+  .btn-grid { display: flex; gap: 12px; }
+  .btn {
+    flex: 1; padding: 17px 10px; border: none; border-radius: var(--radius-sm);
+    font-size: 15px; font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
+    transition: opacity 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.38; cursor: not-allowed; box-shadow: none !important; }
+  .btn-in {
+    background: linear-gradient(135deg, var(--navy), var(--navy-light));
+    color: #fff; box-shadow: 0 6px 16px rgba(18, 52, 95, 0.3);
+  }
+  .btn-out {
+    background: linear-gradient(135deg, var(--gold-deep), var(--gold));
+    color: #2A1F0A; box-shadow: 0 6px 16px rgba(184, 134, 58, 0.28);
+  }
+  .info-box { text-align: center; padding: 34px 16px; color: var(--ink-soft); font-size: 14px; line-height: 1.6; }
+  .info-box b { color: var(--ink); }
+
+  label.field-label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 7px; }
+  select, input[type="tel"], input[type="password"] {
+    width: 100%; padding: 14px 16px; border-radius: var(--radius-sm); border: 1.5px solid var(--line);
+    background: #FBFCFE; font-size: 16px; color: var(--ink); margin-bottom: 16px; box-sizing: border-box;
+    font-family: 'Inter', sans-serif; transition: border-color 0.15s ease;
+  }
+  select:focus, input:focus { outline: none; border-color: var(--gold-deep); background: #fff; }
+  .btn-primary {
+    width: 100%; padding: 16px; border: none; border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, var(--navy), var(--navy-light));
+    color: #fff; font-weight: 700; font-size: 15px; cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif; box-shadow: 0 6px 16px rgba(18, 52, 95, 0.28);
+  }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+  .btn-ganti {
+    width: 100%; margin-top: 10px; padding: 13px; border: 1.5px solid var(--line);
+    background: #fff; color: var(--ink-soft); border-radius: var(--radius-sm); font-weight: 600; cursor: pointer;
+  }
+  #pesanLogin { text-align: center; font-size: 13px; min-height: 18px; margin-bottom: 10px; font-weight: 600; }
+
+  .modal {
+    display: none; position: fixed; inset: 0; background: rgba(10, 20, 40, 0.6);
+    backdrop-filter: blur(2px);
+    align-items: center; justify-content: center; z-index: 50; padding: 16px;
+  }
+  .modal-content { background: var(--card); border-radius: 22px; padding: 22px; width: 100%; max-width: 380px; }
+  .modal-content h3 { margin: 0 0 16px; font-size: 18px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; }
+  #labelFoto {
+    display: block; width: 100%; padding: 46px 15px; margin: 0 0 14px 0;
+    border: 2px dashed #C9D2E3; background: #F8FAFD; border-radius: var(--radius-sm);
+    cursor: pointer; font-size: 15px; font-weight: 600; color: var(--ink-soft);
+    text-align: center; box-sizing: border-box;
+  }
+  #previewFoto {
+    display: none; width: 100%; max-height: 320px; object-fit: cover;
+    border-radius: var(--radius-sm); margin-bottom: 14px; border: 1px solid var(--line);
+  }
+  #statusWajah { text-align: center; font-size: 14px; min-height: 20px; margin-bottom: 14px; font-weight: 600; }
+  .modal-actions { display: flex; gap: 10px; }
+  .btn-secondary {
+    flex: 1; padding: 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--line);
+    background: #fff; color: var(--ink-soft); font-weight: 600; cursor: pointer;
+  }
+  .btn-kirim {
+    flex: 2; padding: 14px; border-radius: var(--radius-sm); border: none;
+    background: linear-gradient(135deg, var(--navy), var(--navy-light));
+    color: #fff; font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .btn-kirim:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .footer-note { text-align: center; font-size: 11.5px; color: #9AA6BE; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand-row">
+      <div class="logo-plate">
+        <img src="icon-192.png" alt="RAY">
+      </div>
+      <div class="brand-sub">Sistem Absensi Karyawan</div>
+    </div>
+  </div>
+
+  <div id="layarMasuk" class="card">
+    <div id="pesanLogin"></div>
+    <label class="field-label" for="pilihNama">Pilih Nama Anda</label>
+    <select id="pilihNama">
+      <option value="">Memuat daftar...</option>
+    </select>
+    <label class="field-label" for="inputPin">PIN (4 digit)</label>
+    <input type="tel" id="inputPin" maxlength="4" pattern="[0-9]*" placeholder="••••">
+    <button class="btn-primary" id="btnMasuk" onclick="prosesMasuk()">Masuk</button>
+  </div>
+
+  <div id="layarUtama" style="display:none;">
+    <div class="card identitas">
+      <div class="avatar" id="avatarInisial">-</div>
+      <div>
+        <div class="nama" id="teksNama"></div>
+        <div class="meta" id="teksBagian"></div>
+      </div>
+    </div>
+
+    <div class="card jam-box">
+      <div id="jamDigital"></div>
+      <div class="status-box">
+        <div class="pill" id="pillIn">Belum Clock In</div>
+        <div class="pill" id="pillOut">Belum Clock Out</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="btn-grid">
+        <button class="btn btn-in" id="btnClockIn" onclick="bukaModal('CLOCK IN')" disabled>Clock In</button>
+        <button class="btn btn-out" id="btnClockOut" onclick="bukaModal('CLOCK OUT')" disabled>Clock Out</button>
+      </div>
+      <button class="btn-ganti" onclick="gantiPengguna()">Ganti Pengguna</button>
+    </div>
+    <div class="footer-note">PT. Ray Mitra Perkasa</div>
+  </div>
+</div>
+
+<div class="modal" id="modalAbsen">
+  <div class="modal-content">
+    <h3 id="judulModal">Absen</h3>
+    <label for="inputFoto" id="labelFoto">📷 Ambil Foto Diri</label>
+    <input type="file" id="inputFoto" accept="image/*" capture="user" style="display:none;" onchange="fotoDiambil(event)">
+    <img id="previewFoto" alt="Preview foto">
+    <div id="statusWajah">Silakan ambil foto wajah Anda</div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="tutupModal()">Batal</button>
+      <button class="btn-kirim" id="btnKirimAbsen" onclick="kirimAbsen()" disabled>Kirim Absensi</button>
+    </div>
+  </div>
+</div>
+<canvas id="canvasAbsen" style="display:none;"></canvas>
+
+<script>
+  var API_BASE = 'https://script.google.com/macros/s/AKfycbxqpGvRnDEW2fL6SS7IVj-PP-Lx1SJB3liBy3EMdTEgZg--odmeKJ8xkQpUtXhdGZen/exec';
+  var MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/weights';
+
+  var faceModelsLoaded = false;
+  var faceModelsLoading = null;
+  var wajahValid = false;
+  var jenisAbsenAktif = '';
+  var fotoBase64Aktif = '';
+  var sesiNama = '';
+  var sesiPin = '';
+
+  function callApi(action, params) {
+    var payload = Object.assign({ action: action }, params || {});
+    return fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    }).then(function (res) { return res.json(); });
+  }
+
+  window.onload = function () {
+    updateJam();
+    setInterval(updateJam, 1000);
+    initFaceApi();
+    muatDaftarNama();
+    daftarkanServiceWorker();
+  };
+
+  function daftarkanServiceWorker() {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js', { scope: './' }).catch(function (e) {
+        console.error('Gagal daftar service worker', e);
+      });
+    }
+  }
+
+  function updateJam() {
+    var now = new Date();
+    var hari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    var bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    var el = document.getElementById('jamDigital');
+    if (!el) return;
+    el.innerHTML =
+      '<div class="tanggal">' + hari[now.getDay()] + ', ' + now.getDate() + ' ' + bulan[now.getMonth()] + ' ' + now.getFullYear() + '</div>' +
+      '<div class="jam">' + now.toTimeString().slice(0, 8) + '</div>';
+  }
+
+  function initFaceApi() {
+    if (!faceModelsLoading) {
+      faceModelsLoading = faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
+        .then(function () { faceModelsLoaded = true; })
+        .catch(function (e) { console.error('Gagal memuat model wajah', e); });
+    }
+    return faceModelsLoading;
+  }
+
+  function muatDaftarNama() {
+    callApi('daftarKaryawan').then(function (res) {
+      var sel = document.getElementById('pilihNama');
+      var daftar = res.daftar || [];
+      if (daftar.length === 0) {
+        sel.innerHTML = '<option value="">Belum ada karyawan terdaftar</option>';
+        return;
+      }
+      sel.innerHTML = '<option value="">-- Pilih Nama --</option>';
+      daftar.forEach(function (nama) {
+        var opt = document.createElement('option');
+        opt.value = nama;
+        opt.innerText = nama;
+        sel.appendChild(opt);
+      });
+    }).catch(function () {
+      document.getElementById('pilihNama').innerHTML = '<option value="">Gagal memuat daftar</option>';
+    });
+  }
+
+  function inisialDari(nama) {
+    var bagian = nama.trim().split(/\s+/);
+    var huruf = bagian[0] ? bagian[0][0] : '';
+    if (bagian.length > 1) huruf += bagian[bagian.length - 1][0];
+    return huruf.toUpperCase();
+  }
+
+  function prosesMasuk() {
+    var nama = document.getElementById('pilihNama').value;
+    var pin = document.getElementById('inputPin').value.trim();
+    var pesanEl = document.getElementById('pesanLogin');
+    var btn = document.getElementById('btnMasuk');
+
+    if (!nama) { pesanEl.innerHTML = '<span style="color:#C0392B;">Pilih nama Anda dulu.</span>'; return; }
+    if (!/^[0-9]{4}$/.test(pin)) { pesanEl.innerHTML = '<span style="color:#C0392B;">PIN harus 4 digit angka.</span>'; return; }
+
+    btn.disabled = true;
+    btn.innerText = 'Memeriksa...';
+    pesanEl.innerHTML = '';
+
+    callApi('login', { nama: nama, pin: pin }).then(function (res) {
+      btn.disabled = false;
+      btn.innerText = 'Masuk';
+      if (!res.sukses) {
+        pesanEl.innerHTML = '<span style="color:#C0392B;">' + res.pesan + '</span>';
+        return;
+      }
+      sesiNama = nama;
+      sesiPin = pin;
+      document.getElementById('teksNama').innerText = nama;
+      document.getElementById('teksBagian').innerText = res.bagianKerja;
+      document.getElementById('avatarInisial').innerText = inisialDari(nama);
+      terapkanStatus(res.status);
+      document.getElementById('layarMasuk').style.display = 'none';
+      document.getElementById('layarUtama').style.display = 'block';
+    }).catch(function (err) {
+      btn.disabled = false;
+      btn.innerText = 'Masuk';
+      pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
+    });
+  }
+
+  function gantiPengguna() {
+    sesiNama = '';
+    sesiPin = '';
+    document.getElementById('inputPin').value = '';
+    document.getElementById('pesanLogin').innerHTML = '';
+    document.getElementById('layarUtama').style.display = 'none';
+    document.getElementById('layarMasuk').style.display = 'block';
+  }
+
+  function terapkanStatus(status) {
+    var pillIn = document.getElementById('pillIn');
+    var pillOut = document.getElementById('pillOut');
+    var btnIn = document.getElementById('btnClockIn');
+    var btnOut = document.getElementById('btnClockOut');
+
+    btnIn.disabled = status.sudahClockIn;
+    btnOut.disabled = !status.sudahClockIn || status.sudahClockOut;
+
+    pillIn.classList.toggle('aktif', status.sudahClockIn);
+    pillIn.innerText = status.sudahClockIn ? 'Sudah Clock In' : 'Belum Clock In';
+    pillOut.classList.toggle('aktif', status.sudahClockOut);
+    pillOut.innerText = status.sudahClockOut ? 'Sudah Clock Out' : 'Belum Clock Out';
+  }
+
+  function muatStatusUlang() {
+    callApi('statusUlang', { nama: sesiNama, pin: sesiPin }).then(function (res) {
+      if (res.sukses) terapkanStatus(res.status);
+    });
+  }
+
+  function bukaModal(jenis) {
+    jenisAbsenAktif = jenis;
+    wajahValid = false;
+    fotoBase64Aktif = '';
+
+    document.getElementById('judulModal').innerText = jenis === 'CLOCK IN' ? 'Absen Masuk' : 'Absen Pulang';
+    document.getElementById('statusWajah').innerText = 'Silakan ambil foto wajah Anda';
+    document.getElementById('btnKirimAbsen').disabled = true;
+    document.getElementById('btnKirimAbsen').innerText = 'Kirim Absensi';
+    document.getElementById('previewFoto').style.display = 'none';
+    document.getElementById('labelFoto').style.display = 'block';
+    document.getElementById('inputFoto').value = '';
+    document.getElementById('modalAbsen').style.display = 'flex';
+  }
+
+  function tutupModal() {
+    document.getElementById('modalAbsen').style.display = 'none';
+  }
+
+  function fotoDiambil(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+
+    var statusEl = document.getElementById('statusWajah');
+    statusEl.innerText = 'Memeriksa foto...';
+    wajahValid = false;
+    document.getElementById('btnKirimAbsen').disabled = true;
+
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = document.getElementById('previewFoto');
+      img.onload = function () {
+        document.getElementById('labelFoto').style.display = 'none';
+        img.style.display = 'block';
+        prosesDeteksiWajah(img);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function prosesDeteksiWajah(img) {
+    var statusEl = document.getElementById('statusWajah');
+    initFaceApi().then(function () {
+      return faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions());
+    }).then(function (deteksi) {
+      if (deteksi.length === 1) {
+        statusEl.innerHTML = '<span style="color:#1B8A5A;">Wajah terdeteksi, siap kirim</span>';
+        wajahValid = true;
+
+        var canvas = document.getElementById('canvasAbsen');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        fotoBase64Aktif = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+
+        document.getElementById('btnKirimAbsen').disabled = false;
+      } else if (deteksi.length === 0) {
+        statusEl.innerHTML = '<span style="color:#C0392B;">Wajah tidak terdeteksi. Ambil foto ulang, pastikan wajah terlihat jelas.</span>';
+      } else {
+        statusEl.innerHTML = '<span style="color:#C0392B;">Ada lebih dari 1 wajah di foto. Ambil ulang dengan hanya wajah Anda.</span>';
+      }
+    }).catch(function (e) {
+      statusEl.innerHTML = '<span style="color:#C0392B;">Gagal memeriksa wajah: ' + e.message + '</span>';
+    });
+  }
+
+  function kirimAbsen() {
+    if (!wajahValid || !fotoBase64Aktif) return;
+    var btn = document.getElementById('btnKirimAbsen');
+    btn.disabled = true;
+    btn.innerText = 'Mengambil lokasi...';
+
+    if (!navigator.geolocation) {
+      tampilkanStatusKirim('Browser tidak mendukung GPS.', false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      btn.innerText = 'Mengirim absen...';
+      callApi('simpanAbsen', {
+        nama: sesiNama,
+        pin: sesiPin,
+        jenisAbsen: jenisAbsenAktif,
+        fotoBase64: fotoBase64Aktif,
+        mimeType: 'image/jpeg',
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        akurasi: Math.round(pos.coords.accuracy)
+      }).then(function (res) {
+        tampilkanStatusKirim(res.pesan, res.sukses);
+        if (res.sukses) {
+          setTimeout(function () {
+            tutupModal();
+            muatStatusUlang();
+          }, 1200);
+        }
+      }).catch(function (err) {
+        tampilkanStatusKirim('Gagal: ' + err.message, false);
+      });
+    }, function (err) {
+      tampilkanStatusKirim('Gagal ambil lokasi GPS: ' + err.message, false);
+    }, { enableHighAccuracy: true, timeout: 15000 });
+  }
+
+  function tampilkanStatusKirim(pesan, sukses) {
+    var statusEl = document.getElementById('statusWajah');
+    statusEl.innerHTML = '<span style="color:' + (sukses ? '#1B8A5A' : '#C0392B') + ';">' + pesan + '</span>';
+    if (!sukses) {
+      document.getElementById('btnKirimAbsen').disabled = false;
+      document.getElementById('btnKirimAbsen').innerText = 'Kirim Absensi';
+    }
+  }
+</script>
+</body>
+</html>
