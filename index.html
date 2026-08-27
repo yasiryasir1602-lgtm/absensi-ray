@@ -147,7 +147,7 @@
   .info-box b { color: var(--ink); }
 
   label.field-label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 7px; }
-  select, input[type="tel"], input[type="password"], input[type="text"] {
+  select, input[type="tel"], input[type="password"], input[type="text"], input[type="date"] {
     width: 100%; padding: 14px 16px; border-radius: var(--radius-sm); border: 1.5px solid var(--line);
     background: #FBFCFE; font-size: 16px; color: var(--ink); margin-bottom: 16px; box-sizing: border-box;
     font-family: 'Inter', sans-serif; transition: border-color 0.15s ease;
@@ -865,10 +865,12 @@
     document.getElementById('btnKirimIjin').disabled = true;
     document.getElementById('btnKirimIjin').innerText = 'Kirim Pengajuan';
     document.getElementById('modalIjin').style.display = 'flex';
+    document.getElementById('kartuGeo').style.visibility = 'hidden'; // sembunyikan peta selama modal ijin terbuka
   }
 
   function tutupModalIjin() {
     document.getElementById('modalIjin').style.display = 'none';
+    document.getElementById('kartuGeo').style.visibility = 'visible';
   }
 
   function buktiIjinDipilih(event) {
