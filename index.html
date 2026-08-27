@@ -169,6 +169,23 @@
   .link-daftar b { color: var(--navy-light); }
   #pesanDaftar { text-align: center; font-size: 13px; min-height: 18px; margin-bottom: 10px; font-weight: 600; }
   #pesanAdminLogin { text-align: center; font-size: 13px; min-height: 18px; margin-bottom: 10px; font-weight: 600; }
+  #pesanIjin { text-align: center; font-size: 13px; min-height: 18px; margin-bottom: 10px; font-weight: 600; }
+  .label-upload {
+    display: block; width: 100%; padding: 30px 15px; margin: 0 0 14px 0;
+    border: 2px dashed #C9D2E3; background: #F8FAFD; border-radius: var(--radius-sm);
+    cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink-soft);
+    text-align: center; box-sizing: border-box;
+  }
+  #previewBuktiIjin {
+    display: none; width: 100%; max-height: 220px; object-fit: cover;
+    border-radius: var(--radius-sm); margin-bottom: 14px; border: 1px solid var(--line);
+  }
+  .btn-ijin {
+    width: 100%; padding: 15px; border: 1.5px solid var(--gold-deep); border-radius: var(--radius-sm);
+    background: #FFFBF3; color: var(--gold-deep); font-weight: 700; font-size: 14px; cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif; margin-bottom: 16px;
+  }
+  .approval-detail a { color: var(--navy-light); font-weight: 600; }
 
   /* Panel admin */
   .approval-item { padding: 13px 0; border-bottom: 1px solid var(--line); }
@@ -320,6 +337,16 @@
         <div class="riwayat-kosong">Memuat...</div>
       </div>
     </div>
+
+    <div class="card">
+      <div class="geo-header">
+        <span class="geo-title">📝 Persetujuan Ijin / Cuti</span>
+      </div>
+      <div id="daftarIjinAdmin">
+        <div class="riwayat-kosong">Memuat...</div>
+      </div>
+    </div>
+
     <button class="btn-ganti" onclick="logoutAdmin()">⎋ Keluar dari Panel Admin</button>
   </div>
 
@@ -380,6 +407,8 @@
         </div>
       </div>
     </div>
+
+    <button class="btn-ijin" onclick="bukaModalIjin()">📝 Ajukan Ijin / Cuti</button>
 
     <div class="card" id="kartuRiwayat">
       <div class="geo-header">
@@ -455,6 +484,30 @@
     <div class="modal-actions">
       <button class="btn-secondary" onclick="tutupModalAdminLogin()">Batal</button>
       <button class="btn-kirim" id="btnLoginAdmin" onclick="prosesLoginAdmin()">Masuk</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalIjin">
+  <div class="modal-content">
+    <h3>Ajukan Ijin / Cuti</h3>
+    <div id="pesanIjin"></div>
+    <label class="field-label" for="ijinJenis">Jenis Ijin</label>
+    <select id="ijinJenis">
+      <option value="Sakit">Sakit</option>
+      <option value="Keperluan Keluarga">Keperluan Keluarga</option>
+      <option value="Lainnya">Lainnya</option>
+    </select>
+    <label class="field-label" for="ijinTanggal">Tanggal</label>
+    <input type="date" id="ijinTanggal">
+    <label class="field-label" for="ijinKeterangan">Keterangan</label>
+    <input type="text" id="ijinKeterangan" placeholder="Contoh: Demam, perlu istirahat">
+    <label for="ijinBukti" id="labelIjinBukti" class="label-upload">📎 Lampirkan Foto/Surat Bukti (wajib)</label>
+    <input type="file" id="ijinBukti" accept="image/*" style="display:none;" onchange="buktiIjinDipilih(event)">
+    <img id="previewBuktiIjin" alt="Preview bukti">
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="tutupModalIjin()">Batal</button>
+      <button class="btn-kirim" id="btnKirimIjin" onclick="kirimIjin()" disabled>Kirim Pengajuan</button>
     </div>
   </div>
 </div>
@@ -705,6 +758,7 @@
       document.getElementById('layarMasuk').style.display = 'none';
       document.getElementById('layarAdmin').style.display = 'block';
       muatPendaftaranAdmin();
+      muatIjinAdmin();
     }).catch(function (err) {
       btn.disabled = false;
       btn.innerText = 'Masuk';
@@ -748,6 +802,127 @@
       muatPendaftaranAdmin();
     }).catch(function (err) {
       alert('Gagal: ' + err.message);
+    });
+  }
+
+  function muatIjinAdmin() {
+    var wrap = document.getElementById('daftarIjinAdmin');
+    wrap.innerHTML = '<div class="riwayat-kosong">Memuat...</div>';
+    callApi('daftarIjinAdmin', { password: adminPasswordAktif }).then(function (res) {
+      if (!res.sukses) {
+        wrap.innerHTML = '<div class="riwayat-kosong">' + escapeHtml(res.pesan) + '</div>';
+        return;
+      }
+      if (!res.daftar || res.daftar.length === 0) {
+        wrap.innerHTML = '<div class="riwayat-kosong">Tidak ada pengajuan ijin yang menunggu persetujuan.</div>';
+        return;
+      }
+      wrap.innerHTML = res.daftar.map(function (p) {
+        var linkBukti = String(p.linkBukti || '');
+        var buktiHtml = linkBukti.indexOf('http') === 0
+          ? '<a href="' + escapeHtml(linkBukti) + '" target="_blank" rel="noopener">Lihat Bukti</a>'
+          : escapeHtml(linkBukti);
+        return '<div class="approval-item">' +
+          '<div class="approval-info">' +
+            '<div class="approval-nama">' + escapeHtml(p.nama) + ' &middot; ' + escapeHtml(p.jenisIjin) + '</div>' +
+            '<div class="approval-detail">Tanggal: ' + escapeHtml(p.tanggalIjin) + ' &middot; ' + escapeHtml(p.keterangan) + '</div>' +
+            '<div class="approval-detail">' + buktiHtml + '</div>' +
+          '</div>' +
+          '<div class="approval-actions">' +
+            '<button class="btn-setujui" onclick="aksiIjin(' + p.baris + ', \'setuju\')">✔ Setujui</button>' +
+            '<button class="btn-tolak" onclick="aksiIjin(' + p.baris + ', \'tolak\')">✘ Tolak</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }).catch(function () {
+      wrap.innerHTML = '<div class="riwayat-kosong">Gagal memuat data.</div>';
+    });
+  }
+
+  function aksiIjin(baris, aksi) {
+    var action = aksi === 'setuju' ? 'setujuiIjin' : 'tolakIjin';
+    callApi(action, { password: adminPasswordAktif, baris: baris }).then(function (res) {
+      alert(res.pesan);
+      muatIjinAdmin();
+    }).catch(function (err) {
+      alert('Gagal: ' + err.message);
+    });
+  }
+
+  // ============ FORM IJIN / CUTI (KARYAWAN) ============
+
+  var buktiIjinBase64 = '';
+
+  function bukaModalIjin() {
+    document.getElementById('ijinJenis').value = 'Sakit';
+    document.getElementById('ijinTanggal').value = '';
+    document.getElementById('ijinKeterangan').value = '';
+    document.getElementById('ijinBukti').value = '';
+    document.getElementById('previewBuktiIjin').style.display = 'none';
+    document.getElementById('labelIjinBukti').style.display = 'block';
+    document.getElementById('pesanIjin').innerHTML = '';
+    buktiIjinBase64 = '';
+    document.getElementById('btnKirimIjin').disabled = true;
+    document.getElementById('btnKirimIjin').innerText = 'Kirim Pengajuan';
+    document.getElementById('modalIjin').style.display = 'flex';
+  }
+
+  function tutupModalIjin() {
+    document.getElementById('modalIjin').style.display = 'none';
+  }
+
+  function buktiIjinDipilih(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = document.getElementById('previewBuktiIjin');
+      img.onload = function () {
+        document.getElementById('labelIjinBukti').style.display = 'none';
+        img.style.display = 'block';
+        buktiIjinBase64 = kompresGambar(img, 1000, 0.75);
+        document.getElementById('btnKirimIjin').disabled = false;
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function kirimIjin() {
+    var jenis = document.getElementById('ijinJenis').value;
+    var tanggal = document.getElementById('ijinTanggal').value;
+    var keterangan = document.getElementById('ijinKeterangan').value.trim();
+    var pesanEl = document.getElementById('pesanIjin');
+    var btn = document.getElementById('btnKirimIjin');
+
+    if (!tanggal) { pesanEl.innerHTML = '<span style="color:#C0392B;">Tanggal ijin harus diisi.</span>'; return; }
+    if (!buktiIjinBase64) { pesanEl.innerHTML = '<span style="color:#C0392B;">Lampiran bukti wajib diisi.</span>'; return; }
+
+    btn.disabled = true;
+    btn.innerText = 'Mengirim...';
+    pesanEl.innerHTML = '';
+
+    callApi('ajukanIjin', {
+      nama: sesiNama,
+      pin: sesiPin,
+      jenisIjin: jenis,
+      tanggalIjin: tanggal,
+      keterangan: keterangan,
+      buktiBase64: buktiIjinBase64,
+      mimeType: 'image/jpeg'
+    }).then(function (res) {
+      btn.disabled = false;
+      btn.innerText = 'Kirim Pengajuan';
+      if (!res.sukses) {
+        pesanEl.innerHTML = '<span style="color:#C0392B;">' + res.pesan + '</span>';
+        return;
+      }
+      pesanEl.innerHTML = '<span style="color:#1B8A5A;">' + res.pesan + '</span>';
+      setTimeout(function () { tutupModalIjin(); }, 2200);
+    }).catch(function (err) {
+      btn.disabled = false;
+      btn.innerText = 'Kirim Pengajuan';
+      pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
     });
   }
 
