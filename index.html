@@ -181,8 +181,12 @@
   }
   #previewFoto {
     display: none; width: 100%; max-height: 320px; object-fit: cover;
-    border-radius: var(--radius-sm); margin-bottom: 14px; border: 1px solid var(--line);
+    border-radius: var(--radius-sm); margin-bottom: 14px; border: 3px solid var(--line);
+    box-sizing: border-box; transition: border-color 0.2s ease;
   }
+  #previewFoto.foto-cek { border-color: #D4A853; }
+  #previewFoto.foto-valid { border-color: #1B8A5A; }
+  #previewFoto.foto-invalid { border-color: #C0392B; }
   #statusWajah { text-align: center; font-size: 14px; min-height: 20px; margin-bottom: 14px; font-weight: 600; }
   .modal-actions { display: flex; gap: 10px; }
   .btn-secondary {
@@ -283,7 +287,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="kartuGeo">
       <div class="geo-header">
         <span class="geo-title">🗺️ Status Geolokasi Realtime</span>
         <button class="btn-kalibrasi" onclick="kalibrasiGPS()">📍 Kalibrasi GPS</button>
@@ -550,6 +554,11 @@
   function kalibrasiGPS() {
     if (!navigator.geolocation) return;
     document.getElementById('geoStatusText').innerText = 'Mengkalibrasi...';
+    // Tahap 1 (cepat): posisi kasar dari WiFi/seluler, biasanya <1 detik, supaya peta langsung tampil
+    navigator.geolocation.getCurrentPosition(prosesPosisiGPS, function () {}, {
+      enableHighAccuracy: false, timeout: 5000, maximumAge: 30000
+    });
+    // Tahap 2 (akurat): GPS asli menyusul, menimpa hasil kasar begitu selesai
     navigator.geolocation.getCurrentPosition(prosesPosisiGPS, gagalAmbilGPS, {
       enableHighAccuracy: true, timeout: 15000
     });
@@ -628,13 +637,16 @@
     document.getElementById('btnKirimAbsen').disabled = true;
     document.getElementById('btnKirimAbsen').innerText = 'Kirim Absensi';
     document.getElementById('previewFoto').style.display = 'none';
+    document.getElementById('previewFoto').classList.remove('foto-cek', 'foto-valid', 'foto-invalid');
     document.getElementById('labelFoto').style.display = 'block';
     document.getElementById('inputFoto').value = '';
     document.getElementById('modalAbsen').style.display = 'flex';
+    document.getElementById('kartuGeo').style.visibility = 'hidden'; // sembunyikan peta selama modal foto terbuka
   }
 
   function tutupModal() {
     document.getElementById('modalAbsen').style.display = 'none';
+    document.getElementById('kartuGeo').style.visibility = 'visible';
   }
 
   function fotoDiambil(event) {
@@ -649,6 +661,8 @@
     var reader = new FileReader();
     reader.onload = function (e) {
       var img = document.getElementById('previewFoto');
+      img.classList.remove('foto-valid', 'foto-invalid');
+      img.classList.add('foto-cek');
       img.onload = function () {
         document.getElementById('labelFoto').style.display = 'none';
         img.style.display = 'block';
@@ -679,19 +693,27 @@
       return faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions());
     }).then(function (deteksi) {
       if (deteksi.length === 1) {
-        statusEl.innerHTML = '<span style="color:#1B8A5A;">Wajah terdeteksi, siap kirim</span>';
+        statusEl.innerHTML = '<span style="color:#1B8A5A;">✔ Foto sudah sesuai, siap kirim</span>';
+        img.classList.remove('foto-cek', 'foto-invalid');
+        img.classList.add('foto-valid');
         wajahValid = true;
 
         fotoBase64Aktif = kompresGambar(img, 800, 0.7);
 
         document.getElementById('btnKirimAbsen').disabled = false;
       } else if (deteksi.length === 0) {
-        statusEl.innerHTML = '<span style="color:#C0392B;">Wajah tidak terdeteksi. Ambil foto ulang, pastikan wajah terlihat jelas.</span>';
+        statusEl.innerHTML = '<span style="color:#C0392B;">✘ Belum sesuai: wajah tidak terdeteksi. Ambil foto ulang, pastikan wajah terlihat jelas.</span>';
+        img.classList.remove('foto-cek', 'foto-valid');
+        img.classList.add('foto-invalid');
       } else {
-        statusEl.innerHTML = '<span style="color:#C0392B;">Ada lebih dari 1 wajah di foto. Ambil ulang dengan hanya wajah Anda.</span>';
+        statusEl.innerHTML = '<span style="color:#C0392B;">✘ Belum sesuai: ada lebih dari 1 wajah di foto. Ambil ulang dengan hanya wajah Anda.</span>';
+        img.classList.remove('foto-cek', 'foto-valid');
+        img.classList.add('foto-invalid');
       }
     }).catch(function (e) {
-      statusEl.innerHTML = '<span style="color:#C0392B;">Gagal memeriksa wajah: ' + e.message + '</span>';
+      statusEl.innerHTML = '<span style="color:#C0392B;">✘ Gagal memeriksa wajah: ' + e.message + '</span>';
+      img.classList.remove('foto-cek', 'foto-valid');
+      img.classList.add('foto-invalid');
     });
   }
 
