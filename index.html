@@ -147,7 +147,7 @@
   .info-box b { color: var(--ink); }
 
   label.field-label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 7px; }
-  select, input[type="tel"], input[type="password"] {
+  select, input[type="tel"], input[type="password"], input[type="text"] {
     width: 100%; padding: 14px 16px; border-radius: var(--radius-sm); border: 1.5px solid var(--line);
     background: #FBFCFE; font-size: 16px; color: var(--ink); margin-bottom: 16px; box-sizing: border-box;
     font-family: 'Inter', sans-serif; transition: border-color 0.15s ease;
@@ -168,6 +168,21 @@
   .link-daftar { text-align: center; margin-top: 14px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
   .link-daftar b { color: var(--navy-light); }
   #pesanDaftar { text-align: center; font-size: 13px; min-height: 18px; margin-bottom: 10px; font-weight: 600; }
+  #pesanAdminLogin { text-align: center; font-size: 13px; min-height: 18px; margin-bottom: 10px; font-weight: 600; }
+
+  /* Panel admin */
+  .approval-item { padding: 13px 0; border-bottom: 1px solid var(--line); }
+  .approval-item:last-child { border-bottom: none; }
+  .approval-info { margin-bottom: 10px; }
+  .approval-nama { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 14.5px; color: var(--ink); margin-bottom: 3px; }
+  .approval-detail { font-size: 12.5px; color: var(--ink-soft); }
+  .approval-actions { display: flex; gap: 8px; }
+  .btn-setujui, .btn-tolak {
+    flex: 1; padding: 10px; border: none; border-radius: var(--radius-sm);
+    font-weight: 700; font-size: 13px; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .btn-setujui { background: var(--ok); color: #fff; }
+  .btn-tolak { background: var(--err); color: #fff; }
 
   .modal {
     display: none; position: fixed; inset: 0; background: rgba(10, 20, 40, 0.6);
@@ -293,6 +308,19 @@
     <input type="tel" id="inputPin" maxlength="4" pattern="[0-9]*" placeholder="••••">
     <button class="btn-primary" id="btnMasuk" onclick="prosesMasuk()">Masuk</button>
     <div class="link-daftar" onclick="bukaModalDaftar()">Belum punya akun? <b>Daftar di sini</b></div>
+    <div class="link-daftar" onclick="bukaModalAdminLogin()">Admin? <b>Masuk di sini</b></div>
+  </div>
+
+  <div id="layarAdmin" style="display:none;">
+    <div class="card">
+      <div class="geo-header">
+        <span class="geo-title">🛡️ Persetujuan Pendaftaran Karyawan</span>
+      </div>
+      <div id="daftarPendaftaranAdmin">
+        <div class="riwayat-kosong">Memuat...</div>
+      </div>
+    </div>
+    <button class="btn-ganti" onclick="logoutAdmin()">⎋ Keluar dari Panel Admin</button>
   </div>
 
   <div id="layarUtama" style="display:none;">
@@ -414,6 +442,19 @@
     <div class="modal-actions">
       <button class="btn-secondary" onclick="tutupModalDaftar()">Batal</button>
       <button class="btn-kirim" id="btnKirimDaftar" onclick="kirimDaftar()">Daftar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalAdminLogin">
+  <div class="modal-content">
+    <h3>Login Admin</h3>
+    <div id="pesanAdminLogin"></div>
+    <label class="field-label" for="adminPassword">Password Admin</label>
+    <input type="password" id="adminPassword" placeholder="Masukkan password">
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="tutupModalAdminLogin()">Batal</button>
+      <button class="btn-kirim" id="btnLoginAdmin" onclick="prosesLoginAdmin()">Masuk</button>
     </div>
   </div>
 </div>
@@ -617,6 +658,103 @@
       btn.innerText = 'Daftar';
       pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
     });
+  }
+
+  // ============ PANEL ADMIN ============
+
+  var adminPasswordAktif = '';
+
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function bukaModalAdminLogin() {
+    document.getElementById('adminPassword').value = '';
+    document.getElementById('pesanAdminLogin').innerHTML = '';
+    document.getElementById('btnLoginAdmin').disabled = false;
+    document.getElementById('btnLoginAdmin').innerText = 'Masuk';
+    document.getElementById('modalAdminLogin').style.display = 'flex';
+  }
+
+  function tutupModalAdminLogin() {
+    document.getElementById('modalAdminLogin').style.display = 'none';
+  }
+
+  function prosesLoginAdmin() {
+    var password = document.getElementById('adminPassword').value.trim();
+    var pesanEl = document.getElementById('pesanAdminLogin');
+    var btn = document.getElementById('btnLoginAdmin');
+
+    if (!password) { pesanEl.innerHTML = '<span style="color:#C0392B;">Masukkan password.</span>'; return; }
+
+    btn.disabled = true;
+    btn.innerText = 'Memeriksa...';
+    pesanEl.innerHTML = '';
+
+    callApi('loginAdmin', { password: password }).then(function (res) {
+      btn.disabled = false;
+      btn.innerText = 'Masuk';
+      if (!res.sukses) {
+        pesanEl.innerHTML = '<span style="color:#C0392B;">' + res.pesan + '</span>';
+        return;
+      }
+      adminPasswordAktif = password;
+      tutupModalAdminLogin();
+      document.getElementById('layarMasuk').style.display = 'none';
+      document.getElementById('layarAdmin').style.display = 'block';
+      muatPendaftaranAdmin();
+    }).catch(function (err) {
+      btn.disabled = false;
+      btn.innerText = 'Masuk';
+      pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
+    });
+  }
+
+  function muatPendaftaranAdmin() {
+    var wrap = document.getElementById('daftarPendaftaranAdmin');
+    wrap.innerHTML = '<div class="riwayat-kosong">Memuat...</div>';
+    callApi('daftarPendaftaranBaru', { password: adminPasswordAktif }).then(function (res) {
+      if (!res.sukses) {
+        wrap.innerHTML = '<div class="riwayat-kosong">' + escapeHtml(res.pesan) + '</div>';
+        return;
+      }
+      if (!res.daftar || res.daftar.length === 0) {
+        wrap.innerHTML = '<div class="riwayat-kosong">Tidak ada pendaftaran yang menunggu persetujuan.</div>';
+        return;
+      }
+      wrap.innerHTML = res.daftar.map(function (p) {
+        return '<div class="approval-item">' +
+          '<div class="approval-info">' +
+            '<div class="approval-nama">' + escapeHtml(p.nama) + '</div>' +
+            '<div class="approval-detail">' + escapeHtml(p.bagianKerja) + ' &middot; PIN: ' + escapeHtml(p.pin) + ' &middot; ' + escapeHtml(p.tanggalDaftar) + '</div>' +
+          '</div>' +
+          '<div class="approval-actions">' +
+            '<button class="btn-setujui" onclick="aksiPendaftaran(' + p.baris + ', \'setuju\')">✔ Setujui</button>' +
+            '<button class="btn-tolak" onclick="aksiPendaftaran(' + p.baris + ', \'tolak\')">✘ Tolak</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }).catch(function () {
+      wrap.innerHTML = '<div class="riwayat-kosong">Gagal memuat data.</div>';
+    });
+  }
+
+  function aksiPendaftaran(baris, aksi) {
+    var action = aksi === 'setuju' ? 'setujuiPendaftaran' : 'tolakPendaftaran';
+    callApi(action, { password: adminPasswordAktif, baris: baris }).then(function (res) {
+      alert(res.pesan);
+      muatPendaftaranAdmin();
+    }).catch(function (err) {
+      alert('Gagal: ' + err.message);
+    });
+  }
+
+  function logoutAdmin() {
+    adminPasswordAktif = '';
+    document.getElementById('layarAdmin').style.display = 'none';
+    document.getElementById('layarMasuk').style.display = 'block';
   }
 
   function gantiPengguna() {
