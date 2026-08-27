@@ -165,6 +165,9 @@
     background: #fff; color: var(--ink-soft); border-radius: var(--radius-sm); font-weight: 600; cursor: pointer;
   }
   #pesanLogin { text-align: center; font-size: 13px; min-height: 18px; margin-bottom: 10px; font-weight: 600; }
+  .link-daftar { text-align: center; margin-top: 14px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
+  .link-daftar b { color: var(--navy-light); }
+  #pesanDaftar { text-align: center; font-size: 13px; min-height: 18px; margin-bottom: 10px; font-weight: 600; }
 
   .modal {
     display: none; position: fixed; inset: 0; background: rgba(10, 20, 40, 0.6);
@@ -289,6 +292,7 @@
     <label class="field-label" for="inputPin">PIN (4 digit)</label>
     <input type="tel" id="inputPin" maxlength="4" pattern="[0-9]*" placeholder="••••">
     <button class="btn-primary" id="btnMasuk" onclick="prosesMasuk()">Masuk</button>
+    <div class="link-daftar" onclick="bukaModalDaftar()">Belum punya akun? <b>Daftar di sini</b></div>
   </div>
 
   <div id="layarUtama" style="display:none;">
@@ -391,6 +395,25 @@
     <div class="modal-actions">
       <button class="btn-secondary" onclick="tutupModal()">Batal</button>
       <button class="btn-kirim" id="btnKirimAbsen" onclick="kirimAbsen()" disabled>Kirim Absensi</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalDaftar">
+  <div class="modal-content">
+    <h3>Daftar Karyawan Baru</h3>
+    <div id="pesanDaftar"></div>
+    <label class="field-label" for="daftarNama">Nama Lengkap</label>
+    <input type="text" id="daftarNama" placeholder="Nama sesuai identitas">
+    <label class="field-label" for="daftarBagian">Bagian Kerja</label>
+    <input type="text" id="daftarBagian" placeholder="Contoh: Staff Administrasi">
+    <label class="field-label" for="daftarPin">Buat PIN (4 digit)</label>
+    <input type="tel" id="daftarPin" maxlength="4" pattern="[0-9]*" placeholder="••••">
+    <label class="field-label" for="daftarPinUlang">Ulangi PIN</label>
+    <input type="tel" id="daftarPinUlang" maxlength="4" pattern="[0-9]*" placeholder="••••">
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="tutupModalDaftar()">Batal</button>
+      <button class="btn-kirim" id="btnKirimDaftar" onclick="kirimDaftar()">Daftar</button>
     </div>
   </div>
 </div>
@@ -542,6 +565,56 @@
     }).catch(function (err) {
       btn.disabled = false;
       btn.innerText = 'Masuk';
+      pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
+    });
+  }
+
+  // ============ REGISTRASI MANDIRI KARYAWAN ============
+
+  function bukaModalDaftar() {
+    document.getElementById('daftarNama').value = '';
+    document.getElementById('daftarBagian').value = '';
+    document.getElementById('daftarPin').value = '';
+    document.getElementById('daftarPinUlang').value = '';
+    document.getElementById('pesanDaftar').innerHTML = '';
+    document.getElementById('btnKirimDaftar').disabled = false;
+    document.getElementById('btnKirimDaftar').innerText = 'Daftar';
+    document.getElementById('modalDaftar').style.display = 'flex';
+  }
+
+  function tutupModalDaftar() {
+    document.getElementById('modalDaftar').style.display = 'none';
+  }
+
+  function kirimDaftar() {
+    var nama = document.getElementById('daftarNama').value.trim();
+    var bagian = document.getElementById('daftarBagian').value.trim();
+    var pin = document.getElementById('daftarPin').value.trim();
+    var pinUlang = document.getElementById('daftarPinUlang').value.trim();
+    var pesanEl = document.getElementById('pesanDaftar');
+    var btn = document.getElementById('btnKirimDaftar');
+
+    if (!nama) { pesanEl.innerHTML = '<span style="color:#C0392B;">Nama tidak boleh kosong.</span>'; return; }
+    if (!bagian) { pesanEl.innerHTML = '<span style="color:#C0392B;">Bagian kerja tidak boleh kosong.</span>'; return; }
+    if (!/^[0-9]{4}$/.test(pin)) { pesanEl.innerHTML = '<span style="color:#C0392B;">PIN harus 4 digit angka.</span>'; return; }
+    if (pin !== pinUlang) { pesanEl.innerHTML = '<span style="color:#C0392B;">PIN dan ulangi PIN tidak sama.</span>'; return; }
+
+    btn.disabled = true;
+    btn.innerText = 'Mengirim...';
+    pesanEl.innerHTML = '';
+
+    callApi('daftarBaru', { nama: nama, bagianKerja: bagian, pin: pin }).then(function (res) {
+      btn.disabled = false;
+      btn.innerText = 'Daftar';
+      if (!res.sukses) {
+        pesanEl.innerHTML = '<span style="color:#C0392B;">' + res.pesan + '</span>';
+        return;
+      }
+      pesanEl.innerHTML = '<span style="color:#1B8A5A;">' + res.pesan + '</span>';
+      setTimeout(function () { tutupModalDaftar(); }, 2200);
+    }).catch(function (err) {
+      btn.disabled = false;
+      btn.innerText = 'Daftar';
       pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
     });
   }
