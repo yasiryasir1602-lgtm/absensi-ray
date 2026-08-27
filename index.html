@@ -376,7 +376,7 @@
 <canvas id="canvasAbsen" style="display:none;"></canvas>
 
 <script>
-  var API_BASE = 'https://script.google.com/macros/s/AKfycbxqpGvRnDEW2fL6SS7IVj-PP-Lx1SJB3liBy3EMdTEgZg--odmeKJ8xkQpUtXhdGZen/exec';
+  var API_BASE = 'https://script.google.com/macros/s/AKfycbw3Fh3yOgEn4BRDdTta161Uvj_8NwAMXEPxaGS0sSLq6mkBUlqiXijdf7zQySc466XH/exec';
   var MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/weights';
 
   var faceModelsLoaded = false;
@@ -392,13 +392,31 @@
   var geoWatchId = null;
   var petaMap = null, petaMarkerUser = null, petaCircle = null;
 
-  function callApi(action, params) {
+  // Kadang Google meredirect permintaan POST ke Apps Script dan body-nya tidak terbawa dengan baik
+  // (terutama di jaringan HP yang kurang stabil) — akibatnya server memproses permintaan itu seolah
+  // cuma health-check (doGet), bukan aksi yang sebenarnya diminta. Deteksi kejadian ini (respons tidak
+  // punya field "sukses"/"daftar" yang seharusnya selalu ada) lalu coba ulang otomatis sebelum menyerah.
+  function callApi(action, params, percobaan) {
+    percobaan = percobaan || 1;
     var payload = Object.assign({ action: action }, params || {});
     return fetch(API_BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
-    }).then(function (res) { return res.json(); });
+    }).then(function (res) { return res.text(); }).then(function (teks) {
+      var data;
+      try { data = JSON.parse(teks); } catch (e) { throw new Error('Respons server tidak valid'); }
+      if (typeof data.sukses === 'undefined' && typeof data.daftar === 'undefined') {
+        throw new Error('Server tidak memproses permintaan dengan benar');
+      }
+      return data;
+    }).catch(function (err) {
+      if (percobaan < 3) {
+        return new Promise(function (resolve) { setTimeout(resolve, 700 * percobaan); })
+          .then(function () { return callApi(action, params, percobaan + 1); });
+      }
+      throw err;
+    });
   }
 
   // Dijalankan langsung (skrip ini ada di akhir body, jadi elemen di atasnya sudah ada di DOM),
