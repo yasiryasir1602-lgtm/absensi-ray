@@ -173,11 +173,21 @@
   }
   .modal-content { background: var(--card); border-radius: 22px; padding: 22px; width: 100%; max-width: 380px; }
   .modal-content h3 { margin: 0 0 16px; font-size: 18px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; }
-  #labelFoto {
-    display: block; width: 100%; padding: 46px 15px; margin: 0 0 14px 0;
-    border: 2px dashed #C9D2E3; background: #F8FAFD; border-radius: var(--radius-sm);
-    cursor: pointer; font-size: 15px; font-weight: 600; color: var(--ink-soft);
-    text-align: center; box-sizing: border-box;
+  #kameraWrap {
+    display: none; position: relative; width: 100%; border-radius: var(--radius-sm);
+    overflow: hidden; margin-bottom: 14px; background: #000; aspect-ratio: 3 / 4;
+  }
+  #videoKamera { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
+  #panduanWajah {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 62%; aspect-ratio: 3 / 4; border: 3px dashed rgba(255,255,255,0.85);
+    border-radius: 50% / 42%; pointer-events: none;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.38);
+  }
+  .btn-kamera-aksi {
+    display: none; width: 100%; padding: 14px; border: none; border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, var(--navy), var(--navy-light)); color: #fff;
+    font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; margin-bottom: 14px;
   }
   #previewFoto {
     display: none; width: 100%; max-height: 320px; object-fit: cover;
@@ -349,9 +359,13 @@
 <div class="modal" id="modalAbsen">
   <div class="modal-content">
     <h3 id="judulModal">Absen</h3>
-    <label for="inputFoto" id="labelFoto">📷 Ambil Foto Diri</label>
-    <input type="file" id="inputFoto" accept="image/*" capture="user" style="display:none;" onchange="fotoDiambil(event)">
+    <div id="kameraWrap">
+      <video id="videoKamera" autoplay playsinline muted></video>
+      <div id="panduanWajah"></div>
+    </div>
     <img id="previewFoto" alt="Preview foto">
+    <button class="btn-kamera-aksi" id="btnAmbilFoto" onclick="ambilFotoDariKamera()">📸 Ambil Foto</button>
+    <button class="btn-kamera-aksi" id="btnUlangFoto" onclick="ulangiFoto()">🔄 Ambil Ulang</button>
     <div id="statusWajah">Silakan ambil foto wajah Anda</div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="tutupModal()">Batal</button>
@@ -628,6 +642,8 @@
     }
   }
 
+  var kameraStream = null;
+
   function bukaModal(jenis) {
     jenisAbsenAktif = jenis;
     wajahValid = false;
@@ -635,48 +651,101 @@
     fotoIntentId++; // batalkan proses deteksi foto sebelumnya (kalau ada) yang masih berjalan
 
     document.getElementById('judulModal').innerText = jenis === 'CLOCK IN' ? 'Absen Masuk' : 'Absen Pulang';
-    document.getElementById('statusWajah').innerText = 'Silakan ambil foto wajah Anda';
+    document.getElementById('statusWajah').innerText = '';
     document.getElementById('btnKirimAbsen').disabled = true;
     document.getElementById('btnKirimAbsen').innerText = 'Kirim Absensi';
     document.getElementById('previewFoto').style.display = 'none';
     document.getElementById('previewFoto').classList.remove('foto-cek', 'foto-valid', 'foto-invalid');
-    document.getElementById('labelFoto').style.display = 'block';
-    document.getElementById('inputFoto').value = '';
+    document.getElementById('btnAmbilFoto').style.display = 'none';
+    document.getElementById('btnUlangFoto').style.display = 'none';
     document.getElementById('modalAbsen').style.display = 'flex';
     document.getElementById('kartuGeo').style.visibility = 'hidden'; // sembunyikan peta selama modal foto terbuka
+
+    mulaiKamera();
   }
 
   function tutupModal() {
     document.getElementById('modalAbsen').style.display = 'none';
     document.getElementById('kartuGeo').style.visibility = 'visible';
+    hentikanKamera();
   }
 
-  function fotoDiambil(event) {
-    var file = event.target.files[0];
-    if (!file) return;
+  // Kamera live di dalam halaman (getUserMedia) — dipakai supaya TIDAK PERNAH keluar dari halaman
+  // ke aplikasi Kamera bawaan HP. Alasan: <input capture> membuka aplikasi Kamera terpisah, dan di HP
+  // ber-RAM terbatas, OS kadang me-reload halaman ini diam-diam saat kembali (memori direbut sistem),
+  // yang bikin status/bingkai foto yang baru diatur JS jadi hilang/balik ke awal.
+  function mulaiKamera() {
+    var statusEl = document.getElementById('statusWajah');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      statusEl.innerHTML = '<span style="color:#C0392B;">Browser tidak mendukung kamera langsung. Coba pakai Chrome/Safari versi terbaru.</span>';
+      return;
+    }
+    statusEl.innerText = 'Menyalakan kamera...';
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } },
+      audio: false
+    }).then(function (stream) {
+      kameraStream = stream;
+      var video = document.getElementById('videoKamera');
+      video.srcObject = stream;
+      document.getElementById('kameraWrap').style.display = 'block';
+      document.getElementById('btnAmbilFoto').style.display = 'block';
+      statusEl.innerText = 'Posisikan wajah Anda di dalam bingkai, lalu tekan Ambil Foto';
+    }).catch(function (err) {
+      statusEl.innerHTML = '<span style="color:#C0392B;">✘ Tidak bisa mengakses kamera: ' + err.message + '. Pastikan izin kamera untuk situs ini sudah diizinkan.</span>';
+    });
+  }
 
-    var myId = ++fotoIntentId; // percobaan foto baru; hasil dari percobaan sebelumnya (kalau masih ada yang jalan) otomatis diabaikan
+  function hentikanKamera() {
+    if (kameraStream) {
+      kameraStream.getTracks().forEach(function (t) { t.stop(); });
+      kameraStream = null;
+    }
+    document.getElementById('kameraWrap').style.display = 'none';
+    document.getElementById('btnAmbilFoto').style.display = 'none';
+  }
+
+  function ambilFotoDariKamera() {
+    var myId = ++fotoIntentId;
+    var video = document.getElementById('videoKamera');
+    var canvas = document.getElementById('canvasAbsen');
+    var w = video.videoWidth, h = video.videoHeight;
+    canvas.width = w;
+    canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    // cerminkan hasil jepretan supaya sama seperti yang dilihat di preview (video juga dicerminkan via CSS)
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, w, h);
+
+    hentikanKamera();
 
     var statusEl = document.getElementById('statusWajah');
     statusEl.innerText = 'Memeriksa foto...';
     wajahValid = false;
     document.getElementById('btnKirimAbsen').disabled = true;
 
-    var reader = new FileReader();
-    reader.onload = function (e) {
-      if (myId !== fotoIntentId) return; // sudah tidak relevan (modal dibuka ulang / foto diganti lagi)
-      var img = document.getElementById('previewFoto');
-      img.classList.remove('foto-valid', 'foto-invalid');
-      img.classList.add('foto-cek');
-      img.onload = function () {
-        if (myId !== fotoIntentId) return;
-        document.getElementById('labelFoto').style.display = 'none';
-        img.style.display = 'block';
-        prosesDeteksiWajah(img, myId);
-      };
-      img.src = e.target.result;
+    var img = document.getElementById('previewFoto');
+    img.classList.remove('foto-valid', 'foto-invalid');
+    img.classList.add('foto-cek');
+    img.onload = function () {
+      if (myId !== fotoIntentId) return;
+      img.style.display = 'block';
+      document.getElementById('btnUlangFoto').style.display = 'block';
+      prosesDeteksiWajah(img, myId);
     };
-    reader.readAsDataURL(file);
+    img.src = canvas.toDataURL('image/jpeg', 0.92);
+  }
+
+  function ulangiFoto() {
+    fotoIntentId++; // batalkan hasil deteksi foto sebelumnya
+    wajahValid = false;
+    fotoBase64Aktif = '';
+    document.getElementById('previewFoto').style.display = 'none';
+    document.getElementById('previewFoto').classList.remove('foto-cek', 'foto-valid', 'foto-invalid');
+    document.getElementById('btnUlangFoto').style.display = 'none';
+    document.getElementById('btnKirimAbsen').disabled = true;
+    mulaiKamera();
   }
 
   // Kompresi: skala turun ke lebar maksimal (px) + kualitas JPEG (0-1), supaya file kecil (hemat kuota Drive)
