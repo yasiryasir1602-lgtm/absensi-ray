@@ -476,7 +476,10 @@
       document.getElementById('layarUtama').style.display = 'block';
       document.getElementById('bottomNav').style.display = 'flex';
       document.body.classList.add('punya-navbar');
-      muatDaftarLokasi().then(mulaiPantauGPS);
+      muatDaftarLokasi().then(function () {
+        mulaiPantauGPS();
+        kalibrasiGPS(); // auto-kalibrasi begitu masuk dashboard; tombol manual tetap ada untuk ulang kalau kurang akurat
+      });
     }).catch(function (err) {
       btn.disabled = false;
       btn.innerText = 'Masuk';
@@ -598,7 +601,10 @@
     if (typeof L === 'undefined') return;
     if (!petaMap) {
       petaMap = L.map('peta', { attributionControl: false }).setView([lat, lng], 17);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(petaMap);
+      L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png', {
+        maxZoom: 20,
+        attribution: '&copy; Stadia Maps, OpenStreetMap contributors'
+      }).addTo(petaMap);
       petaMarkerUser = L.marker([lat, lng]).addTo(petaMap).bindPopup('Lokasi Anda');
     } else {
       petaMarkerUser.setLatLng([lat, lng]);
@@ -653,6 +659,20 @@
     reader.readAsDataURL(file);
   }
 
+  // Kompresi: skala turun ke lebar maksimal (px) + kualitas JPEG (0-1), supaya file kecil (hemat kuota Drive)
+  function kompresGambar(img, lebarMaks, kualitas) {
+    var canvas = document.getElementById('canvasAbsen');
+    var w = img.naturalWidth, h = img.naturalHeight;
+    if (w > lebarMaks) {
+      h = Math.round(h * (lebarMaks / w));
+      w = lebarMaks;
+    }
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', kualitas).split(',')[1];
+  }
+
   function prosesDeteksiWajah(img) {
     var statusEl = document.getElementById('statusWajah');
     initFaceApi().then(function () {
@@ -662,11 +682,7 @@
         statusEl.innerHTML = '<span style="color:#1B8A5A;">Wajah terdeteksi, siap kirim</span>';
         wajahValid = true;
 
-        var canvas = document.getElementById('canvasAbsen');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        fotoBase64Aktif = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+        fotoBase64Aktif = kompresGambar(img, 800, 0.7);
 
         document.getElementById('btnKirimAbsen').disabled = false;
       } else if (deteksi.length === 0) {
