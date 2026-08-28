@@ -218,7 +218,7 @@
   .kpi-tabel th { color: var(--ink-soft); font-weight: 700; font-size: 11.5px; }
   .kpi-catatan { font-size: 11px; color: var(--ink-soft); line-height: 1.5; }
 
-  /* Chatbox Gemini AI */
+  /* Chatbox Asisten AI */
   .chat-ai-isi { max-height: 320px; overflow-y: auto; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
   .chat-ai-kosong { font-size: 13px; color: var(--ink-soft); line-height: 1.6; text-align: center; padding: 10px 4px; }
   .chat-msg { max-width: 85%; padding: 10px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; }
@@ -329,6 +329,8 @@
   }
   .nav-item .nav-icon { font-size: 19px; line-height: 1; }
   .nav-item.aktif { color: var(--navy); }
+  @keyframes ray-berputar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .nav-icon.berputar { display: inline-block; animation: ray-berputar 0.7s linear infinite; }
   body.punya-navbar { padding-bottom: 78px; }
 </style>
 </head>
@@ -391,7 +393,7 @@
 
     <div class="card">
       <div class="geo-header">
-        <span class="geo-title">🤖 Asisten AI (Gemini)</span>
+        <span class="geo-title">🤖 Asisten AI</span>
       </div>
       <div id="chatAIIsi" class="chat-ai-isi">
         <div class="chat-ai-kosong">Tanyakan seputar KPI karyawan periode di atas, misalnya "siapa yang paling sering telat bulan ini?" atau "ada pola yang mencurigakan?"</div>
@@ -483,7 +485,7 @@
     <div class="nav-icon">▦</div>
     Dashboard
   </div>
-  <div class="nav-item" onclick="syncData()">
+  <div class="nav-item" onclick="syncData(this)">
     <div class="nav-icon">⟳</div>
     Sync Data
   </div>
@@ -894,8 +896,8 @@
             '<div class="approval-detail">' + escapeHtml(p.bagianKerja) + ' &middot; PIN: ' + escapeHtml(p.pin) + ' &middot; ' + escapeHtml(p.tanggalDaftar) + '</div>' +
           '</div>' +
           '<div class="approval-actions">' +
-            '<button class="btn-setujui" onclick="aksiPendaftaran(' + p.baris + ', \'setuju\')">✔ Setujui</button>' +
-            '<button class="btn-tolak" onclick="aksiPendaftaran(' + p.baris + ', \'tolak\')">✘ Tolak</button>' +
+            '<button class="btn-setujui" onclick="aksiPendaftaran(' + p.baris + ', \'setuju\', this)">✔ Setujui</button>' +
+            '<button class="btn-tolak" onclick="aksiPendaftaran(' + p.baris + ', \'tolak\', this)">✘ Tolak</button>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -904,12 +906,14 @@
     });
   }
 
-  function aksiPendaftaran(baris, aksi) {
+  function aksiPendaftaran(baris, aksi, btnEl) {
     var action = aksi === 'setuju' ? 'setujuiPendaftaran' : 'tolakPendaftaran';
+    if (btnEl) { btnEl.disabled = true; btnEl.innerText = 'Memproses...'; }
     callApi(action, { password: adminPasswordAktif, baris: baris }).then(function (res) {
       alert(res.pesan);
       muatPendaftaranAdmin();
     }).catch(function (err) {
+      if (btnEl) { btnEl.disabled = false; btnEl.innerText = aksi === 'setuju' ? '✔ Setujui' : '✘ Tolak'; }
       alert('Gagal: ' + err.message);
     });
   }
@@ -938,8 +942,8 @@
             '<div class="approval-detail">' + buktiHtml + '</div>' +
           '</div>' +
           '<div class="approval-actions">' +
-            '<button class="btn-setujui" onclick="aksiIjin(' + p.baris + ', \'setuju\')">✔ Setujui</button>' +
-            '<button class="btn-tolak" onclick="aksiIjin(' + p.baris + ', \'tolak\')">✘ Tolak</button>' +
+            '<button class="btn-setujui" onclick="aksiIjin(' + p.baris + ', \'setuju\', this)">✔ Setujui</button>' +
+            '<button class="btn-tolak" onclick="aksiIjin(' + p.baris + ', \'tolak\', this)">✘ Tolak</button>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -948,12 +952,14 @@
     });
   }
 
-  function aksiIjin(baris, aksi) {
+  function aksiIjin(baris, aksi, btnEl) {
     var action = aksi === 'setuju' ? 'setujuiIjin' : 'tolakIjin';
+    if (btnEl) { btnEl.disabled = true; btnEl.innerText = 'Memproses...'; }
     callApi(action, { password: adminPasswordAktif, baris: baris }).then(function (res) {
       alert(res.pesan);
       muatIjinAdmin();
     }).catch(function (err) {
+      if (btnEl) { btnEl.disabled = false; btnEl.innerText = aksi === 'setuju' ? '✔ Setujui' : '✘ Tolak'; }
       alert('Gagal: ' + err.message);
     });
   }
@@ -1115,7 +1121,7 @@
     wrap.innerHTML = html;
   }
 
-  // ============ CHATBOX GEMINI AI (ADMIN) ============
+  // ============ CHATBOX ASISTEN AI (ADMIN) ============
 
   function kirimPertanyaanAI() {
     var input = document.getElementById('chatAIInput');
@@ -1174,15 +1180,18 @@
     if (geoWatchId !== null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; }
   }
 
-  function syncData() {
-    muatStatusUlang();
+  function syncData(el) {
+    var icon = el ? el.querySelector('.nav-icon') : null;
+    if (icon) icon.classList.add('berputar');
     kalibrasiGPS();
-    muatRiwayat();
+    Promise.all([muatStatusUlang(), muatRiwayat()]).catch(function () {}).then(function () {
+      if (icon) icon.classList.remove('berputar');
+    });
   }
 
   function muatRiwayat() {
     var wrap = document.getElementById('daftarRiwayat');
-    callApi('riwayatAbsensi', { nama: sesiNama, pin: sesiPin }).then(function (res) {
+    return callApi('riwayatAbsensi', { nama: sesiNama, pin: sesiPin }).then(function (res) {
       if (!res.sukses || !res.riwayat || res.riwayat.length === 0) {
         wrap.innerHTML = '<div class="riwayat-kosong">Belum ada riwayat absensi.</div>';
         return;
@@ -1220,7 +1229,7 @@
   }
 
   function muatStatusUlang() {
-    callApi('statusUlang', { nama: sesiNama, pin: sesiPin }).then(function (res) {
+    return callApi('statusUlang', { nama: sesiNama, pin: sesiPin }).then(function (res) {
       if (res.sukses) terapkanStatus(res.status);
     });
   }
