@@ -201,6 +201,35 @@
   .btn-setujui { background: var(--ok); color: #fff; }
   .btn-tolak { background: var(--err); color: #fff; }
 
+  /* Dashboard KPI */
+  .kpi-periode { display: flex; gap: 10px; }
+  .kpi-periode select { margin-bottom: 14px; }
+  .kpi-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .kpi-stat-item { background: #F8FAFD; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; text-align: center; }
+  .kpi-stat-val { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; font-weight: 800; color: var(--navy); }
+  .kpi-stat-lbl { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; font-weight: 600; }
+  .kpi-chart { display: flex; align-items: flex-end; gap: 8px; height: 110px; margin-bottom: 18px; padding: 0 4px; }
+  .kpi-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .kpi-bar { width: 60%; min-width: 14px; background: linear-gradient(180deg, var(--navy-light), var(--navy)); border-radius: 5px 5px 0 0; transition: height 0.2s ease; }
+  .kpi-bar-label { font-size: 10.5px; color: var(--ink-soft); margin-top: 6px; font-weight: 600; }
+  .kpi-tabel-wrap { overflow-x: auto; margin-bottom: 8px; }
+  .kpi-tabel { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .kpi-tabel th, .kpi-tabel td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .kpi-tabel th { color: var(--ink-soft); font-weight: 700; font-size: 11.5px; }
+  .kpi-catatan { font-size: 11px; color: var(--ink-soft); line-height: 1.5; }
+
+  /* Chatbox Gemini AI */
+  .chat-ai-isi { max-height: 320px; overflow-y: auto; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .chat-ai-kosong { font-size: 13px; color: var(--ink-soft); line-height: 1.6; text-align: center; padding: 10px 4px; }
+  .chat-msg { max-width: 85%; padding: 10px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; }
+  .chat-msg-user { align-self: flex-end; background: linear-gradient(135deg, var(--navy), var(--navy-light)); color: #fff; border-bottom-right-radius: 4px; }
+  .chat-msg-ai { align-self: flex-start; background: #F0F3F9; color: var(--ink); border-bottom-left-radius: 4px; }
+  .chat-msg-error { background: var(--err-bg); color: var(--err); }
+  .chat-ai-input-row { display: flex; gap: 8px; }
+  .chat-ai-input-row input { margin-bottom: 0; flex: 1; }
+  .btn-chat-kirim { padding: 0 18px; border: none; border-radius: var(--radius-sm); background: linear-gradient(135deg, var(--gold-deep), var(--gold)); color: #2A1F0A; font-weight: 700; font-size: 13.5px; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; }
+  .btn-chat-kirim:disabled { opacity: 0.5; cursor: not-allowed; }
+
   .modal {
     display: none; position: fixed; inset: 0; background: rgba(10, 20, 40, 0.6);
     backdrop-filter: blur(2px);
@@ -344,6 +373,32 @@
       </div>
       <div id="daftarIjinAdmin">
         <div class="riwayat-kosong">Memuat...</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="geo-header">
+        <span class="geo-title">📊 Dashboard KPI Disiplin</span>
+      </div>
+      <div class="kpi-periode">
+        <select id="kpiBulan" onchange="muatDashboardKPI()"></select>
+        <select id="kpiTahun" onchange="muatDashboardKPI()"></select>
+      </div>
+      <div id="kpiIsi">
+        <div class="riwayat-kosong">Memuat...</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="geo-header">
+        <span class="geo-title">🤖 Asisten AI (Gemini)</span>
+      </div>
+      <div id="chatAIIsi" class="chat-ai-isi">
+        <div class="chat-ai-kosong">Tanyakan seputar KPI karyawan periode di atas, misalnya "siapa yang paling sering telat bulan ini?" atau "ada pola yang mencurigakan?"</div>
+      </div>
+      <div class="chat-ai-input-row">
+        <input type="text" id="chatAIInput" placeholder="Tulis pertanyaan..." onkeydown="if(event.key==='Enter'){kirimPertanyaanAI();}">
+        <button class="btn-chat-kirim" id="btnChatAIKirim" onclick="kirimPertanyaanAI()">Kirim</button>
       </div>
     </div>
 
@@ -759,6 +814,8 @@
       document.getElementById('layarAdmin').style.display = 'block';
       muatPendaftaranAdmin();
       muatIjinAdmin();
+      populateKpiPeriodeSelectors();
+      muatDashboardKPI();
     }).catch(function (err) {
       btn.disabled = false;
       btn.innerText = 'Masuk';
@@ -928,10 +985,127 @@
     });
   }
 
+  // ============ DASHBOARD KPI DISIPLIN (ADMIN) ============
+
+  function populateKpiPeriodeSelectors() {
+    var namaBulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    var now = new Date();
+    var selBulan = document.getElementById('kpiBulan');
+    var selTahun = document.getElementById('kpiTahun');
+    if (selBulan.options.length === 0) {
+      namaBulan.forEach(function (nm, idx) {
+        var opt = document.createElement('option');
+        opt.value = idx + 1;
+        opt.text = nm;
+        selBulan.appendChild(opt);
+      });
+      var tahunSekarang = now.getFullYear();
+      for (var y = tahunSekarang; y >= tahunSekarang - 2; y--) {
+        var optY = document.createElement('option');
+        optY.value = y;
+        optY.text = y;
+        selTahun.appendChild(optY);
+      }
+    }
+    selBulan.value = now.getMonth() + 1;
+    selTahun.value = now.getFullYear();
+  }
+
+  function muatDashboardKPI() {
+    var wrap = document.getElementById('kpiIsi');
+    wrap.innerHTML = '<div class="riwayat-kosong">Memuat...</div>';
+    var bulan = document.getElementById('kpiBulan').value;
+    var tahun = document.getElementById('kpiTahun').value;
+    callApi('ambilDashboardKPI', { password: adminPasswordAktif, bulan: bulan, tahun: tahun }).then(function (res) {
+      if (!res.sukses) {
+        wrap.innerHTML = '<div class="riwayat-kosong">' + escapeHtml(res.pesan) + '</div>';
+        return;
+      }
+      renderKPI(res.kpi);
+    }).catch(function () {
+      wrap.innerHTML = '<div class="riwayat-kosong">Gagal memuat data KPI.</div>';
+    });
+  }
+
+  function renderKPI(kpi) {
+    var wrap = document.getElementById('kpiIsi');
+    var r = kpi.ringkasan;
+
+    var html = '<div class="kpi-stats">' +
+      '<div class="kpi-stat-item"><div class="kpi-stat-val">' + r.rataRataKehadiran + '%</div><div class="kpi-stat-lbl">Rata&#8211;rata Kehadiran</div></div>' +
+      '<div class="kpi-stat-item"><div class="kpi-stat-val">' + r.totalHadir + '</div><div class="kpi-stat-lbl">Total Hadir</div></div>' +
+      '<div class="kpi-stat-item"><div class="kpi-stat-val">' + r.totalTelat + '</div><div class="kpi-stat-lbl">Total Telat</div></div>' +
+      '<div class="kpi-stat-item"><div class="kpi-stat-val">' + r.totalIjin + '</div><div class="kpi-stat-lbl">Total Ijin Disetujui</div></div>' +
+    '</div>';
+
+    var maxHadir = Math.max.apply(null, kpi.grafik.map(function (g) { return g.hadir; }).concat([1]));
+    html += '<div class="kpi-chart">' + kpi.grafik.map(function (g) {
+      var tinggi = Math.round((g.hadir / maxHadir) * 100);
+      return '<div class="kpi-bar-wrap" title="' + escapeHtml(g.label) + ': ' + g.hadir + ' hadir, ' + g.telat + ' telat, ' + g.ijin + ' ijin">' +
+        '<div class="kpi-bar" style="height:' + Math.max(tinggi, 3) + '%"></div>' +
+        '<div class="kpi-bar-label">' + escapeHtml(g.label) + '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+
+    if (!kpi.perKaryawan.length) {
+      html += '<div class="riwayat-kosong">Belum ada data karyawan.</div>';
+    } else {
+      html += '<div class="kpi-tabel-wrap"><table class="kpi-tabel">' +
+        '<tr><th>Nama</th><th>Hadir</th><th>Telat</th><th>Ijin</th><th>%</th></tr>' +
+        kpi.perKaryawan.map(function (k) {
+          return '<tr><td>' + escapeHtml(k.nama) + (k.adaJamStandar ? '' : ' *') + '</td>' +
+            '<td>' + k.hadir + '</td><td>' + k.telat + '</td><td>' + k.ijin + '</td><td>' + k.persenKehadiran + '%</td></tr>';
+        }).join('') +
+      '</table></div>';
+      html += '<div class="kpi-catatan">* Bagian kerja belum punya jam masuk standar (isi di sheet "Jam Kerja Standar") &mdash; telat belum dihitung untuk karyawan ini.</div>';
+    }
+
+    wrap.innerHTML = html;
+  }
+
+  // ============ CHATBOX GEMINI AI (ADMIN) ============
+
+  function kirimPertanyaanAI() {
+    var input = document.getElementById('chatAIInput');
+    var pertanyaan = input.value.trim();
+    if (!pertanyaan) return;
+    var wrap = document.getElementById('chatAIIsi');
+    var kosong = wrap.querySelector('.chat-ai-kosong');
+    if (kosong) kosong.remove();
+
+    wrap.innerHTML += '<div class="chat-msg chat-msg-user">' + escapeHtml(pertanyaan) + '</div>';
+    input.value = '';
+    wrap.scrollTop = wrap.scrollHeight;
+
+    var btn = document.getElementById('btnChatAIKirim');
+    btn.disabled = true;
+    btn.innerText = '...';
+
+    var bulan = document.getElementById('kpiBulan').value;
+    var tahun = document.getElementById('kpiTahun').value;
+
+    callApi('tanyaAdminAI', { password: adminPasswordAktif, pertanyaan: pertanyaan, bulan: bulan, tahun: tahun }).then(function (res) {
+      btn.disabled = false;
+      btn.innerText = 'Kirim';
+      if (!res.sukses) {
+        wrap.innerHTML += '<div class="chat-msg chat-msg-ai chat-msg-error">' + escapeHtml(res.pesan) + '</div>';
+      } else {
+        wrap.innerHTML += '<div class="chat-msg chat-msg-ai">' + escapeHtml(res.jawaban).replace(/\n/g, '<br>') + '</div>';
+      }
+      wrap.scrollTop = wrap.scrollHeight;
+    }).catch(function (err) {
+      btn.disabled = false;
+      btn.innerText = 'Kirim';
+      wrap.innerHTML += '<div class="chat-msg chat-msg-ai chat-msg-error">Gagal terhubung ke server: ' + escapeHtml(err.message) + '</div>';
+      wrap.scrollTop = wrap.scrollHeight;
+    });
+  }
+
   function logoutAdmin() {
     adminPasswordAktif = '';
     document.getElementById('layarAdmin').style.display = 'none';
     document.getElementById('layarMasuk').style.display = 'block';
+    document.getElementById('chatAIIsi').innerHTML = '<div class="chat-ai-kosong">Tanyakan seputar KPI karyawan periode di atas, misalnya "siapa yang paling sering telat bulan ini?" atau "ada pola yang mencurigakan?"</div>';
   }
 
   function gantiPengguna() {
