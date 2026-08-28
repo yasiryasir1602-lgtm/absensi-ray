@@ -617,6 +617,7 @@
   updateJam();
   setInterval(updateJam, 1000);
   muatDaftarNama();
+  cobaSesiTersimpan(); // pulihkan login karyawan/admin kalau sebelumnya tersimpan (bertahan setelah refresh)
   daftarkanServiceWorker();
   // face-api.js dimuat dengan atribut "defer", jadi baru tersedia setelah DOMContentLoaded
   document.addEventListener('DOMContentLoaded', initFaceApi);
@@ -696,26 +697,64 @@
         pesanEl.innerHTML = '<span style="color:#C0392B;">' + res.pesan + '</span>';
         return;
       }
-      sesiNama = nama;
-      sesiPin = pin;
-      document.getElementById('teksNama').innerText = nama;
-      document.getElementById('teksBagian').innerText = res.bagianKerja;
-      document.getElementById('avatarInisial').innerText = inisialDari(nama);
-      terapkanStatus(res.status);
-      document.getElementById('layarMasuk').style.display = 'none';
-      document.getElementById('layarUtama').style.display = 'block';
-      document.getElementById('bottomNav').style.display = 'flex';
-      document.body.classList.add('punya-navbar');
-      muatRiwayat();
-      muatDaftarLokasi().then(function () {
-        mulaiPantauGPS();
-        kalibrasiGPS(); // auto-kalibrasi begitu masuk dashboard; tombol manual tetap ada untuk ulang kalau kurang akurat
-      });
+      simpanSesiKaryawan(nama, pin);
+      tampilkanLayarUtama(nama, pin, res.bagianKerja, res.status);
     }).catch(function (err) {
       btn.disabled = false;
       btn.innerText = 'Masuk';
       pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
     });
+  }
+
+  // Dipakai oleh prosesMasuk() (login manual) dan cobaSesiTersimpan() (auto-login setelah refresh)
+  function tampilkanLayarUtama(nama, pin, bagianKerja, status) {
+    sesiNama = nama;
+    sesiPin = pin;
+    document.getElementById('teksNama').innerText = nama;
+    document.getElementById('teksBagian').innerText = bagianKerja;
+    document.getElementById('avatarInisial').innerText = inisialDari(nama);
+    terapkanStatus(status);
+    document.getElementById('layarMasuk').style.display = 'none';
+    document.getElementById('layarUtama').style.display = 'block';
+    document.getElementById('bottomNav').style.display = 'flex';
+    document.body.classList.add('punya-navbar');
+    muatRiwayat();
+    muatDaftarLokasi().then(function () {
+      mulaiPantauGPS();
+      kalibrasiGPS(); // auto-kalibrasi begitu masuk dashboard; tombol manual tetap ada untuk ulang kalau kurang akurat
+    });
+  }
+
+  // ============ SESI TERSIMPAN (bertahan setelah refresh halaman) ============
+  // localStorage bersifat per-perangkat/browser, bukan disinkron ke server — kalau tidak tersedia
+  // (mis. mode penyamaran), aplikasi tetap jalan normal, cuma kembali minta login tiap refresh.
+
+  function simpanSesiKaryawan(nama, pin) {
+    try { localStorage.setItem('rayKaryawan', JSON.stringify({ nama: nama, pin: pin })); } catch (e) {}
+  }
+  function hapusSesiKaryawan() {
+    try { localStorage.removeItem('rayKaryawan'); } catch (e) {}
+  }
+  function simpanSesiAdmin(password) {
+    try { localStorage.setItem('rayAdmin', password); } catch (e) {}
+  }
+  function hapusSesiAdmin() {
+    try { localStorage.removeItem('rayAdmin'); } catch (e) {}
+  }
+
+  function cobaSesiTersimpan() {
+    var adminTersimpan = null, karyawanTersimpan = null;
+    try { adminTersimpan = localStorage.getItem('rayAdmin'); } catch (e) {}
+    try { karyawanTersimpan = JSON.parse(localStorage.getItem('rayKaryawan') || 'null'); } catch (e) {}
+
+    if (adminTersimpan) {
+      masukPanelAdmin(adminTersimpan);
+    } else if (karyawanTersimpan && karyawanTersimpan.nama && karyawanTersimpan.pin) {
+      callApi('login', { nama: karyawanTersimpan.nama, pin: karyawanTersimpan.pin }).then(function (res) {
+        if (!res.sukses) { hapusSesiKaryawan(); return; }
+        tampilkanLayarUtama(karyawanTersimpan.nama, karyawanTersimpan.pin, res.bagianKerja, res.status);
+      }).catch(function () {}); // gagal terhubung: biarkan saja di layar login, jangan hapus sesi (mungkin cuma jaringan)
+    }
   }
 
   // ============ REGISTRASI MANDIRI KARYAWAN ============
@@ -808,19 +847,32 @@
         pesanEl.innerHTML = '<span style="color:#C0392B;">' + res.pesan + '</span>';
         return;
       }
-      adminPasswordAktif = password;
+      simpanSesiAdmin(password);
       tutupModalAdminLogin();
-      document.getElementById('layarMasuk').style.display = 'none';
-      document.getElementById('layarAdmin').style.display = 'block';
-      muatPendaftaranAdmin();
-      muatIjinAdmin();
-      populateKpiPeriodeSelectors();
-      muatDashboardKPI();
+      tampilkanPanelAdmin(password);
     }).catch(function (err) {
       btn.disabled = false;
       btn.innerText = 'Masuk';
       pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
     });
+  }
+
+  // Dipakai oleh prosesLoginAdmin() (sudah pasti sukses login) dan cobaSesiTersimpan() (perlu verifikasi ulang password)
+  function tampilkanPanelAdmin(password) {
+    adminPasswordAktif = password;
+    document.getElementById('layarMasuk').style.display = 'none';
+    document.getElementById('layarAdmin').style.display = 'block';
+    muatPendaftaranAdmin();
+    muatIjinAdmin();
+    populateKpiPeriodeSelectors();
+    muatDashboardKPI();
+  }
+
+  function masukPanelAdmin(password) {
+    callApi('loginAdmin', { password: password }).then(function (res) {
+      if (!res.sukses) { hapusSesiAdmin(); return; }
+      tampilkanPanelAdmin(password);
+    }).catch(function () {}); // gagal terhubung: biarkan di layar login, jangan hapus sesi (mungkin cuma jaringan)
   }
 
   function muatPendaftaranAdmin() {
@@ -1103,6 +1155,7 @@
 
   function logoutAdmin() {
     adminPasswordAktif = '';
+    hapusSesiAdmin();
     document.getElementById('layarAdmin').style.display = 'none';
     document.getElementById('layarMasuk').style.display = 'block';
     document.getElementById('chatAIIsi').innerHTML = '<div class="chat-ai-kosong">Tanyakan seputar KPI karyawan periode di atas, misalnya "siapa yang paling sering telat bulan ini?" atau "ada pola yang mencurigakan?"</div>';
@@ -1111,6 +1164,7 @@
   function gantiPengguna() {
     sesiNama = '';
     sesiPin = '';
+    hapusSesiKaryawan();
     document.getElementById('inputPin').value = '';
     document.getElementById('pesanLogin').innerHTML = '';
     document.getElementById('layarUtama').style.display = 'none';
