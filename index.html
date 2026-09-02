@@ -185,6 +185,20 @@
     background: #FFFBF3; color: var(--gold-deep); font-weight: 700; font-size: 14px; cursor: pointer;
     font-family: 'Plus Jakarta Sans', sans-serif; margin-bottom: 16px;
   }
+  .btn-patroli {
+    width: 100%; padding: 15px; border: 1.5px solid var(--navy-light); border-radius: var(--radius-sm);
+    background: #F3F6FB; color: var(--navy); font-weight: 700; font-size: 14px; cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif; margin-bottom: 16px;
+  }
+  .btn-laporan {
+    width: 100%; padding: 15px; border: 1.5px solid var(--ok); border-radius: var(--radius-sm);
+    background: #EFFAF4; color: var(--ok); font-weight: 700; font-size: 14px; cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif; margin-bottom: 16px;
+  }
+  .preview-bukti {
+    display: none; width: 100%; max-height: 220px; object-fit: cover;
+    border-radius: var(--radius-sm); margin-bottom: 14px; border: 1px solid var(--line);
+  }
   .approval-detail a { color: var(--navy-light); font-weight: 600; }
 
   /* Panel admin */
@@ -466,6 +480,8 @@
     </div>
 
     <button class="btn-ijin" onclick="bukaModalIjin()">📝 Ajukan Ijin / Cuti</button>
+    <button class="btn-patroli" id="btnPatroli" onclick="bukaModalPatroli()" style="display:none;">🚓 Lapor Patroli</button>
+    <button class="btn-laporan" id="btnLaporanKegiatan" onclick="bukaModalLaporanKegiatan()" style="display:none;">🧹 Laporan Kegiatan</button>
 
     <div class="card" id="kartuRiwayat">
       <div class="geo-header">
@@ -520,7 +536,13 @@
     <label class="field-label" for="daftarNama">Nama Lengkap</label>
     <input type="text" id="daftarNama" placeholder="Nama sesuai identitas">
     <label class="field-label" for="daftarBagian">Bagian Kerja</label>
-    <input type="text" id="daftarBagian" placeholder="Contoh: Staff Administrasi">
+    <select id="daftarBagian">
+      <option value="">-- Pilih Bagian Kerja --</option>
+      <option value="Security">Security</option>
+      <option value="Cleaning Service">Cleaning Service</option>
+      <option value="Administrasi">Administrasi</option>
+      <option value="Lainnya">Lainnya</option>
+    </select>
     <label class="field-label" for="daftarPin">Buat PIN (4 digit)</label>
     <input type="tel" id="daftarPin" maxlength="4" pattern="[0-9]*" placeholder="••••">
     <label class="field-label" for="daftarPinUlang">Ulangi PIN</label>
@@ -568,6 +590,45 @@
     </div>
   </div>
 </div>
+
+<div class="modal" id="modalPatroli">
+  <div class="modal-content">
+    <h3>Lapor Patroli</h3>
+    <div id="pesanPatroli"></div>
+    <label class="field-label" for="patroliTitik">Titik Pos</label>
+    <select id="patroliTitik"></select>
+    <label for="patroliBukti" id="labelPatroliBukti" class="label-upload">📷 Ambil/Lampirkan Foto Pos (wajib)</label>
+    <input type="file" id="patroliBukti" accept="image/*" style="display:none;" onchange="fotoPatroliDipilih(event)">
+    <img id="previewPatroli" class="preview-bukti" alt="Preview foto patroli">
+    <label class="field-label" for="patroliCatatan">Catatan (opsional)</label>
+    <input type="text" id="patroliCatatan" placeholder="Contoh: kondisi aman, tidak ada temuan">
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="tutupModalPatroli()">Batal</button>
+      <button class="btn-kirim" id="btnKirimPatroli" onclick="kirimPatroli()" disabled>Kirim Patroli</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalLaporanKegiatan">
+  <div class="modal-content">
+    <h3>Laporan Kegiatan</h3>
+    <div id="pesanLaporanKegiatan"></div>
+    <label class="field-label" for="kegiatanTugas">Tugas</label>
+    <select id="kegiatanTugas"></select>
+    <label for="kegiatanFotoSebelum" id="labelKegiatanSebelum" class="label-upload">📷 Foto Sebelum (wajib)</label>
+    <input type="file" id="kegiatanFotoSebelum" accept="image/*" style="display:none;" onchange="fotoSebelumDipilih(event)">
+    <img id="previewKegiatanSebelum" class="preview-bukti" alt="Preview foto sebelum">
+    <label for="kegiatanFotoSesudah" id="labelKegiatanSesudah" class="label-upload">📷 Foto Sesudah (wajib)</label>
+    <input type="file" id="kegiatanFotoSesudah" accept="image/*" style="display:none;" onchange="fotoSesudahDipilih(event)">
+    <img id="previewKegiatanSesudah" class="preview-bukti" alt="Preview foto sesudah">
+    <label class="field-label" for="kegiatanCatatan">Catatan (opsional)</label>
+    <input type="text" id="kegiatanCatatan" placeholder="Contoh: sudah dibersihkan menyeluruh">
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="tutupModalLaporanKegiatan()">Batal</button>
+      <button class="btn-kirim" id="btnKirimLaporanKegiatan" onclick="kirimLaporanKegiatan()" disabled>Kirim Laporan</button>
+    </div>
+  </div>
+</div>
 <canvas id="canvasAbsen" style="display:none;"></canvas>
 
 <script>
@@ -582,6 +643,10 @@
   var fotoIntentId = 0; // penanda percobaan foto aktif; hasil deteksi dari percobaan lama/dobel diabaikan
   var sesiNama = '';
   var sesiPin = '';
+
+  var fotoPatroliBase64 = '';
+  var fotoSebelumBase64 = '';
+  var fotoSesudahBase64 = '';
 
   var lokasiList = [];
   var geoWatchId = null;
@@ -715,6 +780,8 @@
     document.getElementById('teksNama').innerText = nama;
     document.getElementById('teksBagian').innerText = bagianKerja;
     document.getElementById('avatarInisial').innerText = inisialDari(nama);
+    document.getElementById('btnPatroli').style.display = (bagianKerja === 'Security') ? 'block' : 'none';
+    document.getElementById('btnLaporanKegiatan').style.display = (bagianKerja === 'Cleaning Service') ? 'block' : 'none';
     terapkanStatus(status);
     document.getElementById('layarMasuk').style.display = 'none';
     document.getElementById('layarUtama').style.display = 'block';
@@ -1039,6 +1106,237 @@
     }).catch(function (err) {
       btn.disabled = false;
       btn.innerText = 'Kirim Pengajuan';
+      pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
+    });
+  }
+
+  // ============ PATROLI (SECURITY) ============
+
+  function bukaModalPatroli() {
+    document.getElementById('pesanPatroli').innerHTML = '';
+    document.getElementById('patroliCatatan').value = '';
+    document.getElementById('patroliBukti').value = '';
+    document.getElementById('previewPatroli').style.display = 'none';
+    document.getElementById('labelPatroliBukti').style.display = 'block';
+    fotoPatroliBase64 = '';
+    document.getElementById('btnKirimPatroli').disabled = true;
+    document.getElementById('btnKirimPatroli').innerText = 'Kirim Patroli';
+
+    var selTitik = document.getElementById('patroliTitik');
+    selTitik.innerHTML = '<option value="">Memuat titik pos...</option>';
+    callApi('daftarTitikPatroli', {}).then(function (res) {
+      selTitik.innerHTML = '';
+      if (res.sukses && res.daftar && res.daftar.length) {
+        res.daftar.forEach(function (t) {
+          var opt = document.createElement('option');
+          opt.value = t.nama;
+          opt.innerText = t.nama;
+          selTitik.appendChild(opt);
+        });
+      } else {
+        selTitik.innerHTML = '<option value="">Belum ada titik pos terdaftar, hubungi admin</option>';
+      }
+    });
+
+    document.getElementById('modalPatroli').style.display = 'flex';
+    document.getElementById('kartuGeo').style.visibility = 'hidden';
+  }
+
+  function tutupModalPatroli() {
+    document.getElementById('modalPatroli').style.display = 'none';
+    document.getElementById('kartuGeo').style.visibility = 'visible';
+  }
+
+  function fotoPatroliDipilih(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = document.getElementById('previewPatroli');
+      img.onload = function () {
+        document.getElementById('labelPatroliBukti').style.display = 'none';
+        img.style.display = 'block';
+        fotoPatroliBase64 = kompresGambar(img, 1000, 0.75);
+        document.getElementById('btnKirimPatroli').disabled = false;
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function kirimPatroli() {
+    var titik = document.getElementById('patroliTitik').value;
+    var catatan = document.getElementById('patroliCatatan').value.trim();
+    var pesanEl = document.getElementById('pesanPatroli');
+    var btn = document.getElementById('btnKirimPatroli');
+
+    if (!titik) { pesanEl.innerHTML = '<span style="color:#C0392B;">Pilih titik pos dulu.</span>'; return; }
+    if (!fotoPatroliBase64) { pesanEl.innerHTML = '<span style="color:#C0392B;">Foto pos wajib dilampirkan.</span>'; return; }
+
+    btn.disabled = true;
+    btn.innerText = 'Mengambil lokasi...';
+    pesanEl.innerHTML = '';
+
+    if (!navigator.geolocation) {
+      pesanEl.innerHTML = '<span style="color:#C0392B;">Browser tidak mendukung GPS.</span>';
+      btn.disabled = false;
+      btn.innerText = 'Kirim Patroli';
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      btn.innerText = 'Mengirim...';
+      callApi('simpanPatroli', {
+        nama: sesiNama,
+        pin: sesiPin,
+        namaPos: titik,
+        fotoBase64: fotoPatroliBase64,
+        mimeType: 'image/jpeg',
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        akurasi: Math.round(pos.coords.accuracy),
+        catatan: catatan
+      }).then(function (res) {
+        btn.disabled = false;
+        btn.innerText = 'Kirim Patroli';
+        if (!res.sukses) {
+          pesanEl.innerHTML = '<span style="color:#C0392B;">' + res.pesan + '</span>';
+          return;
+        }
+        pesanEl.innerHTML = '<span style="color:#1B8A5A;">' + res.pesan + '</span>';
+        setTimeout(function () { tutupModalPatroli(); }, 1800);
+      }).catch(function (err) {
+        btn.disabled = false;
+        btn.innerText = 'Kirim Patroli';
+        pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
+      });
+    }, function (err) {
+      btn.disabled = false;
+      btn.innerText = 'Kirim Patroli';
+      pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal ambil lokasi GPS: ' + err.message + '</span>';
+    }, { enableHighAccuracy: true, timeout: 15000 });
+  }
+
+  // ============ LAPORAN KEGIATAN (CLEANING SERVICE) ============
+
+  function bukaModalLaporanKegiatan() {
+    document.getElementById('pesanLaporanKegiatan').innerHTML = '';
+    document.getElementById('kegiatanCatatan').value = '';
+    document.getElementById('kegiatanFotoSebelum').value = '';
+    document.getElementById('kegiatanFotoSesudah').value = '';
+    document.getElementById('previewKegiatanSebelum').style.display = 'none';
+    document.getElementById('previewKegiatanSesudah').style.display = 'none';
+    document.getElementById('labelKegiatanSebelum').style.display = 'block';
+    document.getElementById('labelKegiatanSesudah').style.display = 'block';
+    fotoSebelumBase64 = '';
+    fotoSesudahBase64 = '';
+    document.getElementById('btnKirimLaporanKegiatan').disabled = true;
+    document.getElementById('btnKirimLaporanKegiatan').innerText = 'Kirim Laporan';
+
+    var selTugas = document.getElementById('kegiatanTugas');
+    selTugas.innerHTML = '<option value="">Memuat daftar tugas...</option>';
+    callApi('daftarTugasKebersihan', {}).then(function (res) {
+      selTugas.innerHTML = '';
+      if (res.sukses && res.daftar && res.daftar.length) {
+        res.daftar.forEach(function (t) {
+          var opt = document.createElement('option');
+          opt.value = t.namaTugas;
+          opt.setAttribute('data-area', t.area);
+          opt.innerText = t.namaTugas + (t.area ? ' (' + t.area + ')' : '');
+          selTugas.appendChild(opt);
+        });
+      } else {
+        selTugas.innerHTML = '<option value="">Belum ada tugas terdaftar, hubungi admin</option>';
+      }
+    });
+
+    document.getElementById('modalLaporanKegiatan').style.display = 'flex';
+    document.getElementById('kartuGeo').style.visibility = 'hidden';
+  }
+
+  function tutupModalLaporanKegiatan() {
+    document.getElementById('modalLaporanKegiatan').style.display = 'none';
+    document.getElementById('kartuGeo').style.visibility = 'visible';
+  }
+
+  function fotoSebelumDipilih(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = document.getElementById('previewKegiatanSebelum');
+      img.onload = function () {
+        document.getElementById('labelKegiatanSebelum').style.display = 'none';
+        img.style.display = 'block';
+        fotoSebelumBase64 = kompresGambar(img, 1000, 0.75);
+        cekSiapKirimLaporan();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function fotoSesudahDipilih(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = document.getElementById('previewKegiatanSesudah');
+      img.onload = function () {
+        document.getElementById('labelKegiatanSesudah').style.display = 'none';
+        img.style.display = 'block';
+        fotoSesudahBase64 = kompresGambar(img, 1000, 0.75);
+        cekSiapKirimLaporan();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function cekSiapKirimLaporan() {
+    document.getElementById('btnKirimLaporanKegiatan').disabled = !(fotoSebelumBase64 && fotoSesudahBase64);
+  }
+
+  function kirimLaporanKegiatan() {
+    var selTugas = document.getElementById('kegiatanTugas');
+    var tugas = selTugas.value;
+    var opsTerpilih = selTugas.options[selTugas.selectedIndex];
+    var area = opsTerpilih ? (opsTerpilih.getAttribute('data-area') || '') : '';
+    var catatan = document.getElementById('kegiatanCatatan').value.trim();
+    var pesanEl = document.getElementById('pesanLaporanKegiatan');
+    var btn = document.getElementById('btnKirimLaporanKegiatan');
+
+    if (!tugas) { pesanEl.innerHTML = '<span style="color:#C0392B;">Pilih tugas dulu.</span>'; return; }
+    if (!fotoSebelumBase64 || !fotoSesudahBase64) {
+      pesanEl.innerHTML = '<span style="color:#C0392B;">Foto sebelum dan sesudah wajib dilampirkan.</span>';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerText = 'Mengirim...';
+    pesanEl.innerHTML = '';
+
+    callApi('simpanLaporanKegiatan', {
+      nama: sesiNama,
+      pin: sesiPin,
+      tugas: tugas,
+      area: area,
+      fotoSebelumBase64: fotoSebelumBase64,
+      fotoSesudahBase64: fotoSesudahBase64,
+      mimeType: 'image/jpeg',
+      catatan: catatan
+    }).then(function (res) {
+      btn.disabled = false;
+      btn.innerText = 'Kirim Laporan';
+      if (!res.sukses) {
+        pesanEl.innerHTML = '<span style="color:#C0392B;">' + res.pesan + '</span>';
+        return;
+      }
+      pesanEl.innerHTML = '<span style="color:#1B8A5A;">' + res.pesan + '</span>';
+      setTimeout(function () { tutupModalLaporanKegiatan(); }, 1800);
+    }).catch(function (err) {
+      btn.disabled = false;
+      btn.innerText = 'Kirim Laporan';
       pesanEl.innerHTML = '<span style="color:#C0392B;">Gagal terhubung ke server: ' + err.message + '</span>';
     });
   }
