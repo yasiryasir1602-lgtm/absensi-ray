@@ -400,6 +400,11 @@
   </div>
 
   <div id="layarAdmin" style="display:none;">
+    <div class="card" style="text-align:center;padding:16px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.4px;color:var(--ink-soft);margin-bottom:4px;">LOGIN SEBAGAI</div>
+      <div id="labelPeranAdmin" style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:15px;color:var(--navy);">-</div>
+    </div>
+
     <div class="card" id="kartuPendaftaranAdmin">
       <div class="geo-header">
         <span class="geo-title">🛡️ Persetujuan Pendaftaran Karyawan</span>
@@ -998,6 +1003,9 @@
     adminPeranAktif = peran;
     document.getElementById('layarMasuk').style.display = 'none';
     document.getElementById('layarAdmin').style.display = 'block';
+    document.getElementById('labelPeranAdmin').innerText = (peran === 'internal')
+      ? 'Admin PT. Ray Mitra Perkasa (akses penuh)'
+      : 'Admin Client (dashboard saja, tanpa persetujuan)';
     document.getElementById('kartuPendaftaranAdmin').style.display = (peran === 'internal') ? 'block' : 'none';
     document.getElementById('kartuIjinAdmin').style.display = (peran === 'internal') ? 'block' : 'none';
     if (peran === 'internal') {
@@ -1135,7 +1143,7 @@
       img.onload = function () {
         document.getElementById('labelIjinBukti').style.display = 'none';
         img.style.display = 'block';
-        buktiIjinBase64 = kompresGambar(img, 1000, 0.75);
+        buktiIjinBase64 = kompresGambar(img, 800, 0.65);
         document.getElementById('btnKirimIjin').disabled = false;
       };
       img.src = e.target.result;
@@ -1188,7 +1196,7 @@
 
   function resetOpState_() {
     opState = {
-      modul: '', daftarLokasi: [], lokasiTerpilih: null,
+      modul: '', daftarLokasi: [], daftarSiap: false, lokasiTerpilih: null,
       lat: null, lng: null, akurasi: null,
       fotoTahap: 'sebelum', fotoSebelumBase64: '', fotoSesudahBase64: '', fotoBase64: ''
     };
@@ -1223,6 +1231,9 @@
     });
   }
 
+  // v6.4: kamera langsung dinyalakan (mulaiTahapScanOp_) TANPA menunggu daftar titik/tugas selesai
+  // dimuat dari server - keduanya jalan BERSAMAAN, bukan berurutan. Sebelumnya kamera baru mulai
+  // setelah API selesai, jadi tombol "Lapor Patroli" terasa lambat padahal cuma nunggu network.
   function bukaModalPatroli() {
     resetOpState_();
     opState.modul = 'patroli';
@@ -1231,14 +1242,15 @@
     document.getElementById('modalOperasional').style.display = 'flex';
     document.getElementById('kartuGeo').style.visibility = 'hidden';
 
-    document.getElementById('pesanOperasional').innerHTML = '<span>Memuat titik patroli...</span>';
+    mulaiTahapScanOp_();
+
     callApi('daftarTitikPatroli', {}).then(function (res) {
-      document.getElementById('pesanOperasional').innerHTML = '';
       opState.daftarLokasi = (res.sukses && res.daftar) ? res.daftar : [];
+      opState.daftarSiap = true;
       isiSelectManualOp_(opState.daftarLokasi, 'nama');
-      mulaiTahapScanOp_();
     }).catch(function () {
-      document.getElementById('pesanOperasional').innerHTML = '<span style="color:#C0392B;">Gagal memuat daftar titik patroli.</span>';
+      opState.daftarSiap = true;
+      document.getElementById('pesanOperasional').innerHTML = '<span style="color:#C0392B;">Gagal memuat daftar titik patroli. Tutup lalu buka lagi.</span>';
     });
   }
 
@@ -1250,14 +1262,15 @@
     document.getElementById('modalOperasional').style.display = 'flex';
     document.getElementById('kartuGeo').style.visibility = 'hidden';
 
-    document.getElementById('pesanOperasional').innerHTML = '<span>Memuat daftar tugas...</span>';
+    mulaiTahapScanOp_();
+
     callApi('daftarTugasKebersihan', {}).then(function (res) {
-      document.getElementById('pesanOperasional').innerHTML = '';
       opState.daftarLokasi = (res.sukses && res.daftar) ? res.daftar : [];
+      opState.daftarSiap = true;
       isiSelectManualOp_(opState.daftarLokasi, 'namaTugas');
-      mulaiTahapScanOp_();
     }).catch(function () {
-      document.getElementById('pesanOperasional').innerHTML = '<span style="color:#C0392B;">Gagal memuat daftar tugas.</span>';
+      opState.daftarSiap = true;
+      document.getElementById('pesanOperasional').innerHTML = '<span style="color:#C0392B;">Gagal memuat daftar tugas. Tutup lalu buka lagi.</span>';
     });
   }
 
@@ -1274,6 +1287,8 @@
   function tampilkanPilihManualOp() {
     hentikanScanQR_();
     hentikanKameraGenerik_();
+    // isi ulang tiap kali dibuka, jaga-jaga kalau daftar baru selesai dimuat setelah kamera duluan jalan
+    isiSelectManualOp_(opState.daftarLokasi, opState.modul === 'patroli' ? 'nama' : 'namaTugas');
     document.getElementById('pilihManualOp').style.display = 'block';
   }
 
@@ -1294,6 +1309,11 @@
   }
 
   function prosesKodeScanOp_(kode) {
+    if (!opState.daftarSiap) {
+      document.getElementById('statusScanOp').innerHTML =
+        '<span style="color:#B8863A;">Sedang menyiapkan data lokasi, coba scan lagi sebentar...</span>';
+      return;
+    }
     var kodeNormal = normalisasiKodeQr_(kode);
     var cocok = null;
     for (var i = 0; i < opState.daftarLokasi.length; i++) {
@@ -1409,7 +1429,7 @@
       img.style.display = 'block';
       document.getElementById('btnUlangFotoOp').style.display = 'block';
       document.getElementById('btnAmbilFotoOp').style.display = 'none';
-      var base64 = kompresGambar(img, 1000, 0.75);
+      var base64 = kompresGambar(img, 800, 0.65);
       lanjutSetelahFotoOp_(base64);
     };
     img.src = canvas.toDataURL('image/jpeg', 0.92);
@@ -1679,12 +1699,12 @@
       return;
     }
     var html = '<div class="kpi-tabel-wrap"><table class="kpi-tabel">' +
-      '<tr><th>Nama</th><th>Bagian</th><th>Jml Lapor</th><th>Rata2/Hari</th></tr>' +
+      '<tr><th>Nama</th><th>Bagian</th><th>Jml Lapor</th><th>Rata2/Hari</th><th>Terakhir Lapor</th></tr>' +
       kpi.perStaf.map(function (s) {
-        return '<tr><td>' + escapeHtml(s.nama) + '</td><td>' + singkatan + '</td><td>' + s.jumlahLapor + '</td><td>' + s.rataRataPerHari + '</td></tr>';
+        return '<tr><td>' + escapeHtml(s.nama) + '</td><td>' + singkatan + '</td><td>' + s.jumlahLapor + '</td><td>' + s.rataRataPerHari + '</td><td>' + escapeHtml(s.terakhirLapor) + '</td></tr>';
       }).join('') +
       '</table></div>' +
-      '<div class="kpi-catatan">Berdasarkan ' + kpi.hariKerja + ' hari kerja berjalan bulan ini.</div>';
+      '<div class="kpi-catatan">Jml Lapor & Rata2/Hari berdasarkan ' + kpi.hariKerja + ' hari kerja berjalan bulan ini. Terakhir Lapor dihitung dari semua waktu (tidak terikat periode di atas).</div>';
     wrap.innerHTML = html;
   }
 
@@ -2029,7 +2049,7 @@
         img.classList.add('foto-valid');
         wajahValid = true;
 
-        fotoBase64Aktif = kompresGambar(img, 800, 0.7);
+        fotoBase64Aktif = kompresGambar(img, 800, 0.65);
 
         document.getElementById('btnKirimAbsen').disabled = false;
       } else if (deteksi.length === 0) {
